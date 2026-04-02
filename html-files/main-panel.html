@@ -1,0 +1,55 @@
+<style>
+    .scs-help-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; border-radius: 50%; background: #aaa; color: #fff; font-size: 9px; font-weight: bold; cursor: help; vertical-align: middle; }
+    .scs-help-tooltip { display: none; position: absolute; left: 50%; top: 16px; transform: translateX(-50%); width: 200px; background: #333; color: #fff; font-size: 11px; font-weight: normal; padding: 6px 8px; border-radius: 4px; z-index: 9999; line-height: 1.4; white-space: normal; }
+    .scs-help-icon:hover .scs-help-tooltip { display: block; }
+    .scs-phase-1 .scs-checkbox-col { display: none; }
+    .scs-phase-2 .scs-delete-col { display: none; }
+    .scs-phase-3 #scs-course-table { display: none; }
+    .scs-phase-2 #scs-add-btn, .scs-phase-3 #scs-add-btn { display: none; }
+    #scs-computed-placeholder { display: none; color: #888; font-style: italic; padding: 10px 0; text-align: center; }
+    .scs-phase-3 #scs-computed-placeholder { display: block; }
+    #scs-nav { display: flex; flex-direction: column; align-items: center; margin-top: 8px; gap: 5px; }
+    #scs-nav-btns { display: flex; gap: 6px; }
+    .scs-nav-btn { padding: 2px 10px; cursor: pointer; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 13px; }
+    .scs-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    #scs-dots { display: flex; gap: 5px; }
+    .scs-dot { width: 7px; height: 7px; border-radius: 50%; background: #CCD4E0; }
+    .scs-dot.scs-dot-active { background: #5a7fa8; }
+</style>
+<div id="scs-container" style="background-color: #ECF0F5; border: 1px solid #CCD4E0; margin-bottom: 15px; padding: 10px; font-family: sans-serif; font-size: 13px;">
+    <div style="font-weight: bold; font-size: 15px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #CCD4E0;">
+        Schedule Conflict Solver v1.0
+    </div>
+    <div id="scs-course-section">
+        <table id="scs-course-table" style="border-collapse: collapse; width: 100%;">
+            <thead>
+                <tr>
+                    <th style="padding: 2px 6px; text-align: center; font-size: 11px;">#</th>
+                    <th class="scs-delete-col"></th>
+                    <th style="padding: 2px 6px; text-align: left;">
+                        Course
+                        <div style="font-weight: normal; font-size: 10px; color: #888;">&lt;subject code&gt;<span style="color: red;">*</span> &lt;course number&gt; &lt;section number&gt; <span class="scs-help-icon">?<div class="scs-help-tooltip">Subject code must be specified, while course number and section number are optional. Leaving either blank may create more possible schedules.</div></span></div>
+                    </th>
+                    <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Discussion</th>
+                    <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lecture</th>
+                    <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lab</th>
+                </tr>
+            </thead>
+            <tbody id="scs-course-rows">
+            </tbody>
+        </table>
+        <button id="scs-add-btn" style="width: 100%; padding: 4px 0; margin-top: 4px; cursor: pointer; font-size: 16px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px;">+</button>
+        <div id="scs-computed-placeholder">Computed Schedules go here</div>
+    </div>
+    <div id="scs-nav">
+        <div id="scs-nav-btns">
+            <button id="scs-back-btn" class="scs-nav-btn">&#8249; Back</button>
+            <button id="scs-fwd-btn" class="scs-nav-btn">Next &#8250;</button>
+        </div>
+        <div id="scs-dots">
+            <span class="scs-dot" data-phase="1"></span>
+            <span class="scs-dot" data-phase="2"></span>
+            <span class="scs-dot" data-phase="3"></span>
+        </div>
+    </div>
+</div>

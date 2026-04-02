@@ -10,7 +10,15 @@
   "content_scripts": [
     {
       "matches": ["https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=*"],
-      "js": ["scripts/content.js"]
+      "js": ["scripts/getPidm.js", "scripts/search.js", "scripts/content.js"]
     }
-  ]
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["html-files/main-panel.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "permissions": ["scripting"],
+  "host_permissions": ["<url of the schedule builder>"]
 }
