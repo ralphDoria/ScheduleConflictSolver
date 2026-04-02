@@ -1,5 +1,17 @@
 console.log("Hello from ScheduleConflictSolver");
 
+let userPidm = 0;
+getPidm().then(pidm => {
+    console.log(pidm);
+    userPidm = pidm;
+
+    // hardcoded values for now
+    search("ecs36b", "", userPidm, 202603).then(data => {
+        let parsedDataArray = parseData(data);
+    })
+})
+
+
 // Getting left container and injecting our own html within it
 let div_leftContainer = document.getElementById("LeftContainer");
 if (div_leftContainer == null) {
