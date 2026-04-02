@@ -1,0 +1,87 @@
+  {
+    "courseDepartmentNotes": [],
+    "courseSubjectNotes": [],
+    "icmsData": {
+      "newDescription": "Object-oriented programming in C++. Basic data structures and their use. Writing good programs of increased complexity and efficiency. Methods for debugging and verification.",
+      "creditLimit": "No credit to students who have completed ECS 032B, ECS 032C, ECS 034, ECS 040 or ECS 060.",
+      "ge3": "SE",
+      "crossListing": "",
+      "prereq": "ECS 030 C- or better or ECS 036A C- or better."
+    },
+    "finalExam": {
+      "examDate": "June, 05 2026 10:30:00"
+    },
+    "meeting": [
+      {
+        "thursday": false,
+        "sunday": false,
+        "startDate": "March, 30 2026 00:00:00",
+        "endTime": "1600",
+        "tuesday": false,
+        "friday": true,
+        "endDate": "June, 04 2026 00:00:00",
+        "daysString": "F",
+        "wednesday": false,
+        "monday": false,
+        "meetCode": "D",
+        "startTime": "1510",
+        "building": "The Grove (Surge III)",
+        "description": "Discussion",
+        "buildingCode": "GROVE",
+        "saturday": false,
+        "type": "DIS",
+        "room": "01309"
+      },
+      {
+        "thursday": false,
+        "sunday": false,
+        "startDate": "March, 30 2026 00:00:00",
+        "endTime": "1500",
+        "tuesday": false,
+        "friday": true,
+        "endDate": "June, 04 2026 00:00:00",
+        "daysString": "MWF",
+        "wednesday": true,
+        "monday": true,
+        "meetCode": "A",
+        "startTime": "1410",
+        "building": "The Grove (Surge III)",
+        "description": "Lecture",
+        "buildingCode": "GROVE",
+        "saturday": false,
+        "type": "LEC",
+        "room": "01309"
+      }
+    ],
+    "crnNotes": [],
+    "importantNotes": [],
+    "course": {
+      "termCode": "202603",
+      "dropDesc": "10 Day Drop",
+      "unitsLow": 4,
+      "reservedSeating": false,
+      "shortDesc": "ECS 036B 001",
+      "gradeMode": "",
+      "unitsInd": "",
+      "seqNum": "001",
+      "printCRN": "38146",
+      "unitsHigh": 0,
+      "dropDate": "April, 10 2026 00:00:00",
+      "title": "Software Development & Object-Oriented Programming in C++     ",
+      "subjectDesc": "Engineering Computer Science",
+      "courseNum": "036B",
+      "hidCRN": "38146",
+      "crn": "38146",
+      "subjectCode": "ECS"
+    },
+    "instructor": [
+      {
+        "lastName": "Butner",
+        "instructorName": "M. Butner",
+        "firstName": "Matthew",
+        "instructorEmail": "mfbutner@ucdavis.edu",
+        "fullName": "Matthew Butner"
+      }
+    ]
+  }
+]
