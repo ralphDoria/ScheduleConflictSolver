@@ -10,7 +10,7 @@
   "content_scripts": [
     {
       "matches": ["https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=*"],
-      "js": ["content.js"]
+      "js": ["scripts/content.js"]
     }
   ]
 }
