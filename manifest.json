@@ -1,6 +1,6 @@
 {
-  "name": "Hello Extensions of the World!",
-  "description": "Base Level Extension",
+  "name": "ScheduleBob",
+  "description": "An automatic schedule builder & course conflict solver for UC Davis's ScheduleBuilder",
   "version": "1.0",
   "manifest_version": 3,
   "action": {

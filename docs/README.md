@@ -1,6 +1,8 @@
 # Schedule Conflict Sovler
 
-Name to be decided.
+Name: ScheduleBob
+
+Description: ScheduleBob is an automatic schedule builder & course conflict solver for UC Davis's ScheduleBuilder. If you're asking yourself "can we fix it" in reference to your course schedule conflict, just know, yes we can (I mean it's not garunteed, but it'll probably be really helpful).
 
 ## The Gist
 Want to be able to come up with a combination of courses based on some parameters:
