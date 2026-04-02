@@ -1,0 +1,16 @@
+{
+  "name": "Hello Extensions of the World!",
+  "description": "Base Level Extension",
+  "version": "1.0",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": "images/hello_extension_icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=*"],
+      "js": ["content.js"]
+    }
+  ]
+}
