@@ -1,16 +1,29 @@
 console.log("Hello from ScheduleConflictSolver");
 
 let userPidm = 0;
+
 getPidm().then(pidm => {
     console.log(pidm);
     userPidm = pidm;
 
     // hardcoded values for now
-    search("ecs", "", userPidm, 202603).then(data => {
-        let parsedCourseSlot = parseCourseSlot(data);
-        console.log(parsedCourseSlot)
-    })
+    const results = Promise.all([
+        search("phy 009b", "", userPidm, 202603),
+        search("phi 22", "", userPidm, 202603), // it seems somestimes, when course number isn't in 3 digit form, search query fails to find
+        search("ecs 1", "", userPidm, 202603),
+        search("ecs 36c", "", userPidm, 202603),
+    ])
+        .then(results => {
+            console.log(results);
+            let parsedResults = results.map(element => {
+                return parseCourseSlot(element);
+            })
+
+            console.log(parsedResults);
+            console.log(createAllPossibleSchedules(parsedResults))
+        })
 })
+
 
 
 // Getting left container and injecting our own html within it
