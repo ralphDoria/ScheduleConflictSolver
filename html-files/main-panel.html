@@ -14,9 +14,16 @@
     .scs-nav-btn:disabled { opacity: 0.3; cursor: default; }
     .scs-nav-tooltip { display: none; position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: 200px; background: #333; color: #fff; font-size: 11px; padding: 6px 8px; border-radius: 4px; z-index: 9999; line-height: 1.4; white-space: normal; text-align: center; }
     .scs-nav-btn:disabled:hover .scs-nav-tooltip { display: block; }
-    .scs-course-card { position: relative; display: inline-block; margin: 2px; vertical-align: top; }
-    .scs-toggle-btn { display: inline-block; padding: 3px 8px; font-size: 11px; border: 1px solid #5a7fa8; border-radius: 12px; cursor: pointer; background: #5a7fa8; color: #fff; transition: all 0.15s; user-select: none; }
+    .scs-course-card { position: relative; display: inline-flex; margin: 2px; vertical-align: top; border-radius: 12px; overflow: visible; }
+    .scs-toggle-btn { display: inline-flex; align-items: center; font-size: 11px; border: 1px solid #5a7fa8; border-radius: 12px; background: #5a7fa8; color: #fff; transition: all 0.15s; user-select: none; overflow: hidden; }
     .scs-toggle-btn.scs-toggle-off { background: #fff; color: #888; border-color: #CCD4E0; }
+    .scs-card-info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 3px; border-radius: 50%; background: rgba(255,255,255,0.3); color: #fff; font-size: 9px; font-weight: bold; text-decoration: none; cursor: pointer; flex-shrink: 0; }
+    .scs-toggle-btn.scs-toggle-off .scs-card-info { background: rgba(0,0,0,0.08); color: #888; }
+    .scs-card-info:hover { background: rgba(255,255,255,0.5); }
+    .scs-toggle-btn.scs-toggle-off .scs-card-info:hover { background: rgba(0,0,0,0.15); }
+    .scs-card-label { padding: 3px 4px 3px 4px; cursor: pointer; }
+    .scs-card-dropdown-arrow { padding: 3px 6px 3px 4px; cursor: pointer; border-left: 1px solid rgba(255,255,255,0.3); }
+    .scs-toggle-btn.scs-toggle-off .scs-card-dropdown-arrow { border-left-color: #CCD4E0; }
     .scs-section-dropdown { display: none; position: absolute; left: 0; top: 100%; background: #fff; border: 1px solid #CCD4E0; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); z-index: 9999; min-width: 120px; padding: 4px 0; margin-top: 2px; }
     .scs-course-card.scs-dropdown-open .scs-section-dropdown { display: block; }
     .scs-section-item { display: flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; white-space: nowrap; }
@@ -24,9 +31,11 @@
     .scs-section-item input[type="checkbox"] { margin: 0; }
     .scs-slot-summary { font-size: 11px; color: #666; margin-top: 4px; }
     .scs-slot-no-results { font-size: 11px; color: #c44; font-style: italic; }
-    #scs-results-list { text-align: left; padding: 0; margin: 0; list-style: none; font-size: 12px; }
-    #scs-results-list li { padding: 6px 8px; border-bottom: 1px solid #CCD4E0; }
-    #scs-results-list li:last-child { border-bottom: none; }
+    .scs-results-scroll { overflow-x: auto; margin-top: 6px; }
+    #scs-results-table { border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+    #scs-results-table th, #scs-results-table td { padding: 4px 8px; border: 1px solid #CCD4E0; text-align: center; }
+    #scs-results-table th { background: #e2e7ef; font-weight: bold; position: sticky; top: 0; }
+    #scs-results-table td { background: #fff; }
     #scs-dots { display: flex; gap: 5px; }
     .scs-dot { width: 7px; height: 7px; border-radius: 50%; background: #CCD4E0; }
     .scs-dot.scs-dot-active { background: #5a7fa8; }
@@ -43,7 +52,7 @@
                     <th class="scs-delete-col"></th>
                     <th style="padding: 2px 6px; text-align: left;">
                         Course
-                        <div style="font-weight: normal; font-size: 10px; color: #888;">&lt;subject code&gt;<span style="color: red;">*</span> &lt;course number&gt; &lt;section number&gt; <span class="scs-help-icon">?<div class="scs-help-tooltip">Subject code must be specified, while course number and section number are optional. Leaving either blank may create more possible schedules.</div></span></div>
+                        <div style="font-weight: normal; font-size: 10px; color: #888;">&lt;subject code&gt;<span style="color: red;">*</span> &lt;course number&gt; &lt;section number&gt; / &lt;instructor last name&gt; / &lt;keyword&gt; <span class="scs-help-icon">?<div class="scs-help-tooltip">Subject code must be specified, while course number and section number are optional. Leaving either blank may create more possible schedules.</div></span></div>
                     </th>
                     <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Discussion</th>
                     <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lecture</th>
