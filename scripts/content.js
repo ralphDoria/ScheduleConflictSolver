@@ -1,7 +1,7 @@
 console.log("Hello from ScheduleConflictSolver");
 
 let userPidm = 0;
-const termCode = 202603;
+const termCode = getTermCode();
 
 getPidm().then(pidm => {
     console.log(pidm);

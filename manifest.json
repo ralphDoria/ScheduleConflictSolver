@@ -15,7 +15,7 @@
   "content_scripts": [
     {
       "matches": ["https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=*"],
-      "js": ["scripts/getPidm.js", "scripts/search.js", "scripts/parseData.js", "scripts/parseCustomTimeBlocks.js", "scripts/createAllPossibleSchedules.js", "scripts/content.js"]
+      "js": ["scripts/getTermCode.js", "scripts/getPidm.js", "scripts/search.js", "scripts/parseData.js", "scripts/parseCustomTimeBlocks.js", "scripts/createAllPossibleSchedules.js", "scripts/content.js"]
     }
   ],
   "web_accessible_resources": [
@@ -25,5 +25,5 @@
     }
   ],
   "permissions": ["scripting"],
-  "host_permissions": ["<url of the schedule builder>"]
+  "host_permissions": ["https://my.ucdavis.edu/schedulebuilder"]
 }
