@@ -273,4 +273,61 @@ describe("createAllPossibleSchedules", () => {
         // Both ECS options work since PHY is on a different day
         expect(results).toHaveLength(2);
     });
+
+    test("handles array-format slot (multi-subject-code slot)", () => {
+        // Slot 1 has two different subject codes from two search queries
+        const slots = [
+            [
+                makeSlot("ECS", {
+                    "036B": {
+                        "001": makeSection(null, [makeMeeting("LEC", ["M", "W"], 1000, 1100)])
+                    }
+                }),
+                makeSlot("PHI", {
+                    "022": {
+                        "001": makeSection(null, [makeMeeting("LEC", ["T", "R"], 1000, 1100)])
+                    }
+                })
+            ],
+            makeSlot("MAT", {
+                "021A": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["F"], 900, 1000)])
+                }
+            })
+        ];
+
+        const results = createAllPossibleSchedules(slots);
+        // ECS and PHI are alternatives in the same slot; both compatible with MAT
+        expect(results).toHaveLength(2);
+        expect(results[0][0].subjectCode).toBe("ECS");
+        expect(results[1][0].subjectCode).toBe("PHI");
+        expect(results[0][1].subjectCode).toBe("MAT");
+    });
+
+    test("array-format slot with conflicts filters correctly", () => {
+        const slots = [
+            [
+                makeSlot("ECS", {
+                    "036B": {
+                        "001": makeSection(null, [makeMeeting("LEC", ["M"], 1000, 1100)])
+                    }
+                }),
+                makeSlot("PHI", {
+                    "022": {
+                        "001": makeSection(null, [makeMeeting("LEC", ["T"], 1000, 1100)])
+                    }
+                })
+            ],
+            makeSlot("MAT", {
+                "021A": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["M"], 1000, 1100)]) // conflicts with ECS
+                }
+            })
+        ];
+
+        const results = createAllPossibleSchedules(slots);
+        // Only PHI + MAT should work; ECS conflicts with MAT
+        expect(results).toHaveLength(1);
+        expect(results[0][0].subjectCode).toBe("PHI");
+    });
 });

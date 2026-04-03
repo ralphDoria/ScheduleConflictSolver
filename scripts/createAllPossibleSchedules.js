@@ -1,4 +1,4 @@
-function flattenSlot(slot) {
+function flattenSingleSlot(slot) {
     const options = [];
     for (const [courseNum, seqNums] of Object.entries(slot.courseNums)) {
         for (const [seqNum, info] of Object.entries(seqNums)) {
@@ -12,6 +12,13 @@ function flattenSlot(slot) {
         }
     }
     return options;
+}
+
+function flattenSlot(slot) {
+    if (Array.isArray(slot)) {
+        return slot.flatMap(flattenSingleSlot);
+    }
+    return flattenSingleSlot(slot);
 }
 
 function meetingPairConflicts(a, b) {
@@ -83,5 +90,5 @@ function createAllPossibleSchedules(courseSlots) {
 }
 
 if (typeof module !== "undefined") {
-    module.exports = { flattenSlot, meetingPairConflicts, meetingsConflict, createAllPossibleSchedules };
+    module.exports = { flattenSlot, flattenSingleSlot, meetingPairConflicts, meetingsConflict, createAllPossibleSchedules };
 }

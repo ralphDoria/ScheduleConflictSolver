@@ -29,6 +29,24 @@ if (div_leftContainer != null) {
 
             // --- Row creation ---
 
+            function scsCreateInputEntry() {
+                const div = document.createElement("div");
+                div.className = "scs-multi-input";
+                div.innerHTML = `
+                    <button class="scs-multi-remove" title="Remove query" style="display: none;">&#128465;</button>
+                    <input type="text" placeholder="e.g. CSE 101 or Sandoval or Software">
+                `;
+                return div;
+            }
+
+            function scsUpdateMultiRemoveButtons(container) {
+                const entries = container.querySelectorAll(".scs-multi-input");
+                entries.forEach(entry => {
+                    const btn = entry.querySelector(".scs-multi-remove");
+                    btn.style.display = entries.length > 1 ? "" : "none";
+                });
+            }
+
             function scsCreateRow() {
                 const tr = document.createElement("tr");
                 tr.className = "scs-course-row";
@@ -37,13 +55,21 @@ if (div_leftContainer != null) {
                     <td class="scs-delete-col" style="padding: 2px; text-align: center;">
                         <button class="scs-remove-btn" style="cursor: pointer; background: none; border: none; font-size: 14px; color: #888;" title="Remove">&#128465;</button>
                     </td>
-                    <td class="scs-course-cell" style="padding: 2px;">
-                        <input type="text" placeholder="e.g. CSE 101 or Sandoval or Software" style="display: block; width: 100%; box-sizing: border-box; padding: 3px 5px; margin: 0; border: 1px solid #CCD4E0; border-radius: 3px;">
-                    </td>
+                    <td class="scs-course-cell" style="padding: 2px;"></td>
                     <td class="scs-checkbox-col" style="padding: 2px; text-align: center;"><input type="checkbox" style="margin: 0;"></td>
                     <td class="scs-checkbox-col" style="padding: 2px; text-align: center;"><input type="checkbox" style="margin: 0;"></td>
                     <td class="scs-checkbox-col" style="padding: 2px; text-align: center;"><input type="checkbox" style="margin: 0;"></td>
                 `;
+                const cell = tr.querySelector(".scs-course-cell");
+                const container = document.createElement("div");
+                container.className = "scs-multi-container";
+                container.appendChild(scsCreateInputEntry());
+                const addBtn = document.createElement("button");
+                addBtn.className = "scs-multi-add";
+                addBtn.title = "Add another query to this slot";
+                addBtn.innerHTML = "+";
+                container.appendChild(addBtn);
+                cell.appendChild(container);
                 return tr;
             }
 
@@ -76,9 +102,12 @@ if (div_leftContainer != null) {
                 const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
                 const filled = [];
                 rows.forEach((row, i) => {
-                    const input = row.querySelector("input[type='text']");
-                    if (input && input.value.trim().length >= 3) {
-                        filled.push({ index: i, query: input.value.trim() });
+                    const inputs = row.querySelectorAll(".scs-multi-input input[type='text']");
+                    const queries = Array.from(inputs)
+                        .map(inp => inp.value.trim())
+                        .filter(q => q.length >= 3);
+                    if (queries.length > 0) {
+                        filled.push({ index: i, queries });
                     }
                 });
                 return filled;
@@ -130,34 +159,74 @@ if (div_leftContainer != null) {
 
                 const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
 
-                // Collect queries, hide empty rows, search filled ones
-                const searchPromises = [];
+                // Collect all queries per row, build search tasks
+                const rowSearchTasks = []; // { rowIndex, queries[], promises[] }
 
                 rows.forEach((row, i) => {
-                    const input = row.querySelector("input[type='text']");
-                    const query = input ? input.value.trim() : "";
-                    rowQueries.push(query);
+                    const inputs = row.querySelectorAll(".scs-multi-input input[type='text']");
+                    const queries = Array.from(inputs).map(inp => inp.value.trim());
+                    rowQueries.push(queries);
 
-                    if (query.length >= 3) {
-                        searchPromises.push({ index: i, promise: search(query, "", userPidm, termCode) });
+                    const filledQueries = queries.filter(q => q.length >= 3);
+                    if (filledQueries.length > 0) {
+                        rowSearchTasks.push({
+                            rowIndex: i,
+                            promises: filledQueries.map(q => search(q, "", userPidm, termCode))
+                        });
                         row.style.display = "";
                     } else {
                         row.style.display = "none";
                     }
                 });
 
-                Promise.all(searchPromises.map(s => s.promise)).then(results => {
-                    // Map results back to original row indices
+                // Flatten all promises, track mapping
+                const allPromises = [];
+                const promiseMap = []; // { rowIndex, queryIndex }
+                rowSearchTasks.forEach(task => {
+                    task.promises.forEach((p, qi) => {
+                        promiseMap.push({ rowIndex: task.rowIndex, queryIndex: qi });
+                        allPromises.push(p);
+                    });
+                });
+
+                Promise.all(allPromises).then(results => {
+                    // Group parsed results by row
+                    const rowResults = {}; // rowIndex -> array of parseCourseSlot results
                     results.forEach((data, ri) => {
-                        const i = searchPromises[ri].index;
+                        const { rowIndex } = promiseMap[ri];
+                        if (!rowResults[rowIndex]) rowResults[rowIndex] = [];
                         if (data && data.length > 0) {
-                            parsedSlots[i] = parseCourseSlot(data);
-                        } else {
-                            parsedSlots[i] = null;
+                            rowResults[rowIndex].push(parseCourseSlot(data));
                         }
                     });
 
-                    // Re-number visible rows
+                    // Package parsed data: merge same-subject, array for multi-subject
+                    for (const [rowIndexStr, parsedList] of Object.entries(rowResults)) {
+                        const i = parseInt(rowIndexStr);
+                        const validParsed = parsedList.filter(p => p !== null);
+                        if (validParsed.length === 0) {
+                            parsedSlots[i] = null;
+                            continue;
+                        }
+
+                        const subjectCodes = new Set(validParsed.map(p => p.subjectCode));
+                        if (subjectCodes.size === 1) {
+                            // Merge courseNums into a single object
+                            const merged = { subjectCode: validParsed[0].subjectCode, courseNums: {} };
+                            validParsed.forEach(p => {
+                                for (const [cn, seqs] of Object.entries(p.courseNums)) {
+                                    if (!merged.courseNums[cn]) merged.courseNums[cn] = {};
+                                    Object.assign(merged.courseNums[cn], seqs);
+                                }
+                            });
+                            parsedSlots[i] = merged;
+                        } else {
+                            // Different subject codes — store as array
+                            parsedSlots[i] = validParsed;
+                        }
+                    }
+
+                    // Build phase 2 UI
                     let visibleNum = 1;
                     rows.forEach((row, i) => {
                         if (row.style.display === "none") return;
@@ -166,24 +235,29 @@ if (div_leftContainer != null) {
                         const cell = row.querySelector(".scs-course-cell");
                         const slot = parsedSlots[i];
 
-                        if (!slot || Object.keys(slot.courseNums).length === 0) {
+                        // Normalize to array for uniform rendering
+                        const slotList = !slot ? [] : Array.isArray(slot) ? slot : [slot];
+
+                        if (slotList.length === 0 || slotList.every(s => Object.keys(s.courseNums).length === 0)) {
                             cell.innerHTML = '<span class="scs-slot-no-results">No courses found</span>';
                             return;
                         }
 
                         const catalogBase = "https://catalog.ucdavis.edu/courses-subject-code/";
-                        const subjectCode = slot.subjectCode;
 
                         let cardsHTML = "";
-                        for (const courseNum of Object.keys(slot.courseNums)) {
-                            const label = subjectCode + " " + courseNum;
-                            const seqNums = Object.keys(slot.courseNums[courseNum]);
-                            let dropdownHTML = '<div class="scs-section-dropdown">';
-                            for (const seqNum of seqNums) {
-                                dropdownHTML += `<label class="scs-section-item"><input type="checkbox" checked data-row="${i}" data-course-num="${courseNum}" data-seq-num="${seqNum}"> ${seqNum}</label>`;
+                        for (const parsed of slotList) {
+                            const subjectCode = parsed.subjectCode;
+                            for (const courseNum of Object.keys(parsed.courseNums)) {
+                                const label = subjectCode + " " + courseNum;
+                                const seqNums = Object.keys(parsed.courseNums[courseNum]);
+                                let dropdownHTML = '<div class="scs-section-dropdown">';
+                                for (const seqNum of seqNums) {
+                                    dropdownHTML += `<label class="scs-section-item"><input type="checkbox" checked data-row="${i}" data-subject-code="${subjectCode}" data-course-num="${courseNum}" data-seq-num="${seqNum}"> ${seqNum}</label>`;
+                                }
+                                dropdownHTML += '</div>';
+                                cardsHTML += `<span class="scs-course-card" data-row="${i}" data-subject-code="${subjectCode}" data-course-num="${courseNum}"><span class="scs-toggle-btn scs-toggle-on" data-course-num="${courseNum}" data-row="${i}"><a class="scs-card-info" href="${catalogBase}${subjectCode.toLowerCase()}/" target="_blank" title="Additional course info">?</a><span class="scs-card-label">${label}</span><span class="scs-card-dropdown-arrow">&#9662;</span></span>${dropdownHTML}</span>`;
                             }
-                            dropdownHTML += '</div>';
-                            cardsHTML += `<span class="scs-course-card" data-row="${i}" data-course-num="${courseNum}"><span class="scs-toggle-btn scs-toggle-on" data-course-num="${courseNum}" data-row="${i}"><a class="scs-card-info" href="${catalogBase}${subjectCode.toLowerCase()}/" target="_blank" title="Additional course info">?</a><span class="scs-card-label">${label}</span><span class="scs-card-dropdown-arrow">&#9662;</span></span>${dropdownHTML}</span>`;
                         }
                         const summaryHTML = `<p class="scs-slot-summary" data-row="${i}"></p>`;
                         cell.innerHTML = cardsHTML + summaryHTML;
@@ -202,16 +276,17 @@ if (div_leftContainer != null) {
                 if (!slot) return;
 
                 const checkedBoxes = document.querySelectorAll(`.scs-section-dropdown input[type="checkbox"][data-row="${rowIndex}"]:checked`);
+                // Group by subjectCode + courseNum
                 const included = {};
                 checkedBoxes.forEach(cb => {
-                    const courseNum = cb.dataset.courseNum;
-                    if (!included[courseNum]) included[courseNum] = [];
-                    included[courseNum].push(cb.dataset.seqNum);
+                    const key = cb.dataset.subjectCode + " " + cb.dataset.courseNum;
+                    if (!included[key]) included[key] = [];
+                    included[key].push(cb.dataset.seqNum);
                 });
 
                 const parts = [];
-                for (const [courseNum, seqNums] of Object.entries(included)) {
-                    parts.push(slot.subjectCode + " " + courseNum + " (" + seqNums.join(", ") + ")");
+                for (const [courseLabel, seqNums] of Object.entries(included)) {
+                    parts.push(courseLabel + " (" + seqNums.join(", ") + ")");
                 }
 
                 if (parts.length > 0) {
@@ -246,24 +321,46 @@ if (div_leftContainer != null) {
                 rows.forEach((row, i) => {
                     const slot = parsedSlots[i];
                     if (!slot) return;
+                    const slotList = Array.isArray(slot) ? slot : [slot];
 
                     const checkedBoxes = document.querySelectorAll(`.scs-section-dropdown input[type="checkbox"][data-row="${i}"]:checked`);
                     if (checkedBoxes.length === 0) return;
 
-                    const refinedCourseNums = {};
+                    // Group checked sections by subjectCode
+                    const bySubject = {};
                     checkedBoxes.forEach(cb => {
+                        const sc = cb.dataset.subjectCode;
                         const courseNum = cb.dataset.courseNum;
                         const seqNum = cb.dataset.seqNum;
-                        if (!slot.courseNums[courseNum] || !slot.courseNums[courseNum][seqNum]) return;
-                        if (!refinedCourseNums[courseNum]) refinedCourseNums[courseNum] = {};
-                        refinedCourseNums[courseNum][seqNum] = slot.courseNums[courseNum][seqNum];
+                        if (!bySubject[sc]) bySubject[sc] = {};
+                        if (!bySubject[sc][courseNum]) bySubject[sc][courseNum] = [];
+                        bySubject[sc][courseNum].push(seqNum);
                     });
 
-                    if (Object.keys(refinedCourseNums).length > 0) {
-                        refinedSlots.push({
-                            subjectCode: slot.subjectCode,
-                            courseNums: refinedCourseNums
-                        });
+                    // Build refined slot(s) by looking up section data from parsed slot
+                    const refinedForRow = [];
+                    for (const [sc, courseNums] of Object.entries(bySubject)) {
+                        const source = slotList.find(s => s.subjectCode === sc);
+                        if (!source) continue;
+                        const refinedCourseNums = {};
+                        for (const [cn, seqNums] of Object.entries(courseNums)) {
+                            if (!source.courseNums[cn]) continue;
+                            refinedCourseNums[cn] = {};
+                            for (const sn of seqNums) {
+                                if (source.courseNums[cn][sn]) {
+                                    refinedCourseNums[cn][sn] = source.courseNums[cn][sn];
+                                }
+                            }
+                        }
+                        if (Object.keys(refinedCourseNums).length > 0) {
+                            refinedForRow.push({ subjectCode: sc, courseNums: refinedCourseNums });
+                        }
+                    }
+
+                    if (refinedForRow.length === 1) {
+                        refinedSlots.push(refinedForRow[0]);
+                    } else if (refinedForRow.length > 1) {
+                        refinedSlots.push(refinedForRow);
                     }
                 });
 
@@ -298,13 +395,27 @@ if (div_leftContainer != null) {
             }
 
             function scsBackToPhase1() {
-                // Restore text inputs and show all rows
+                // Restore multi-input structure and show all rows
                 const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
                 rows.forEach((row, i) => {
                     row.style.display = "";
                     const cell = row.querySelector(".scs-course-cell");
-                    const query = rowQueries[i] || "";
-                    cell.innerHTML = `<input type="text" placeholder="e.g. CSE 101 or Sandoval or Software" value="${query}" style="display: block; width: 100%; box-sizing: border-box; padding: 3px 5px; margin: 0; border: 1px solid #CCD4E0; border-radius: 3px;">`;
+                    const queries = rowQueries[i] || [""];
+                    cell.innerHTML = "";
+                    const container = document.createElement("div");
+                    container.className = "scs-multi-container";
+                    queries.forEach(q => {
+                        const entry = scsCreateInputEntry();
+                        entry.querySelector("input[type='text']").value = q;
+                        container.appendChild(entry);
+                    });
+                    const addBtn = document.createElement("button");
+                    addBtn.className = "scs-multi-add";
+                    addBtn.title = "Add another query to this slot";
+                    addBtn.innerHTML = "+";
+                    container.appendChild(addBtn);
+                    cell.appendChild(container);
+                    scsUpdateMultiRemoveButtons(container);
                 });
                 parsedSlots = [];
                 scsUpdateRowNumbers();
@@ -329,8 +440,31 @@ if (div_leftContainer != null) {
                 scsValidatePhase1();
             });
 
-            // Remove row
+            // Remove row / multi-input interactions
             tbody.addEventListener("click", (e) => {
+                // Multi-input add button
+                const multiAdd = e.target.closest(".scs-multi-add");
+                if (multiAdd && scsCurrentPhase === 1) {
+                    const container = multiAdd.closest(".scs-multi-container");
+                    const entry = scsCreateInputEntry();
+                    container.insertBefore(entry, multiAdd);
+                    scsUpdateMultiRemoveButtons(container);
+                    scsValidatePhase1();
+                    return;
+                }
+
+                // Multi-input remove button
+                const multiRemove = e.target.closest(".scs-multi-remove");
+                if (multiRemove && scsCurrentPhase === 1) {
+                    const container = multiRemove.closest(".scs-multi-container");
+                    const entries = container.querySelectorAll(".scs-multi-input");
+                    if (entries.length <= 1) return;
+                    multiRemove.closest(".scs-multi-input").remove();
+                    scsUpdateMultiRemoveButtons(container);
+                    scsValidatePhase1();
+                    return;
+                }
+
                 const removeBtn = e.target.closest(".scs-remove-btn");
                 if (removeBtn) {
                     const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
