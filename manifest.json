@@ -4,13 +4,13 @@
   "version": "1.0",
   "manifest_version": 3,
   "icons": {
-    "16": "images/ScheduleBobLogoGrounded.png",
-    "48": "images/ScheduleBobLogoGrounded.png",
-    "128": "images/ScheduleBobLogoGrounded.png"
+    "16": "images/ScheduleBobLogoZoomed.png",
+    "48": "images/ScheduleBobLogoZoomed.png",
+    "128": "images/ScheduleBobLogoZoomed.png"
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_icon": "images/ScheduleBobLogoGrounded.png"
+    "default_icon": "images/ScheduleBobLogoZoomed.png"
   },
   "content_scripts": [
     {

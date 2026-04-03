@@ -1,6 +1,44 @@
 <html>
+  <head>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        background-color: transparent;
+      }
+      .container {
+        padding: 12px;
+        min-width: 240px;
+        background-color: #87CEEB;
+        text-align: center;
+      }
+      h1 {
+        margin: 0 0 8px 0;
+        font-size: 18px;
+      }
+      p {
+        margin: 0 0 8px 0;
+      }
+      a {
+        display: inline-block;
+        margin-bottom: 12px;
+      }
+      img {
+        max-width: 150px;
+        margin: 0 auto;
+        display: block;
+      }
+    </style>
+  </head>
   <body>
-    <h1>Hello Extensions</h1>
+    <div class="container">
+      <h1>ScheduleBob</h1>
+      <p>ScheduleBob works from UC Davis ScheduleBuilder</p>
+      <a href="https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=" target="_blank">Go to ScheduleBuilder</a>
+      <img src="../images/ScheduleBobLogoFull.png" alt="ScheduleBob Logo">
+    </div>
     <script src="popup.js"></script>
   </body>
 </html>
