@@ -1,56 +1,47 @@
-const courses = [
-    // Array of JS objects, where each index corresponds
-    // to the order they were entered in the first phase of the UI
-    {
-        subjectCode: "ECS", // data[i].course.subjectCode
-        timeMappings: {
-            "036B": {
-                // Sequence number mapping to meeting times, but sequence number
-                // broken up since a common letter indicates same lecTime/lecturer.
-                "A": {
-                    lecTime: {
-                        days: ['t', 'r'],
-                        startTime: 1330,
-                        endTime: 1600
-                    },
-                    seqNums: {
-                        "1": {
-                            disTime: {
-                                days: ['m', 'w', 'f'],
-                                startTime: 1330,
-                                endTime: 1500
-                            },
-                            labTime: {
+// Parses the API response array for a single course slot into a structured
+// object suitable for schedule combination algorithms.
+//
+// Input:  array of section objects from the host site API
+// Output: {
+//     subjectCode,
+//     courseNums: {
+//         [courseNum]: {
+//             [seqNum]: { lectureGroup, meetings: [{ type, days, startTime, endTime }] }
+//         }
+//     }
+// }
 
-                            }
-                        },
-                        "2": {}
-                    }
-                },
-                "B": {
-                    lecTime: {},
-                    seqNums: {}
-                },
-                // some sequence nubmers don't have associated letters
-                // so they'll contain times for all meeting types directly
-                "1": {
-                    lecTime: {
-                        days: ['m', 'w', 'f'],
-                        startTime: 1330,
-                        endTime: 1500
-                    },
-                    disTime: {},
-                    labTime: {}
-                }
-            }
-        },
-    },
-    {} // second possible class, and so on
-];
+function parseCourseSlot(data) {
+    if (!data || data.length === 0) return null;
 
-function parseData(data) {
-    // console.log(data);
-    for (const course of data) {
-        console.log(course.meeting);
+    const subjectCode = data[0].course.subjectCode;
+    const courseNums = {};
+
+    for (const entry of data) {
+        const courseNum = entry.course.courseNum;
+        const seqNum = entry.course.seqNum;
+
+        if (!courseNums[courseNum]) {
+            courseNums[courseNum] = {};
+        }
+
+        courseNums[courseNum][seqNum] = {
+            lectureGroup: extractLectureGroup(seqNum),
+            meetings: entry.meeting.map(m => ({
+                type: m.type,
+                days: m.daysString.split(""),
+                startTime: parseInt(m.startTime),
+                endTime: parseInt(m.endTime)
+            }))
+        };
     }
+
+    return { subjectCode, courseNums };
+}
+
+// Extracts the letter prefix from a sequence number, if any.
+// "A01" -> "A", "B02" -> "B", "001" -> null
+function extractLectureGroup(seqNum) {
+    const match = seqNum.match(/^([A-Za-z]+)/);
+    return match ? match[1] : null;
 }

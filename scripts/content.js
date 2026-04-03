@@ -6,8 +6,9 @@ getPidm().then(pidm => {
     userPidm = pidm;
 
     // hardcoded values for now
-    search("ecs36b", "", userPidm, 202603).then(data => {
-        let parsedDataArray = parseData(data);
+    search("ecs", "", userPidm, 202603).then(data => {
+        let parsedCourseSlot = parseCourseSlot(data);
+        console.log(parsedCourseSlot)
     })
 })
 
