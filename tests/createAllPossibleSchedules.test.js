@@ -330,4 +330,58 @@ describe("createAllPossibleSchedules", () => {
         expect(results).toHaveLength(1);
         expect(results[0][0].subjectCode).toBe("PHI");
     });
+
+    test("excludes combinations with overlapping final exams", () => {
+        const slots = [
+            makeSlot("ECS", {
+                "036B": {
+                    "001": makeSection(null, [
+                        makeMeeting("LEC", ["M", "W"], 1000, 1100),
+                        makeMeeting("FINAL", ["2026-06-05"], 1030, 1230)
+                    ])
+                }
+            }),
+            makeSlot("PHY", {
+                "009B": {
+                    "A01": makeSection("A", [
+                        makeMeeting("LEC", ["T", "R"], 1400, 1500),
+                        makeMeeting("FINAL", ["2026-06-05"], 1100, 1300) // overlaps with ECS final
+                    ]),
+                    "B01": makeSection("B", [
+                        makeMeeting("LEC", ["T", "R"], 1600, 1700),
+                        makeMeeting("FINAL", ["2026-06-08"], 1030, 1230) // different date, no conflict
+                    ])
+                }
+            })
+        ];
+
+        const results = createAllPossibleSchedules(slots);
+        // A01 final overlaps with ECS final; only B01 should survive
+        expect(results).toHaveLength(1);
+        expect(results[0][1].seqNum).toBe("B01");
+    });
+
+    test("finals on same weekday but different dates do not conflict", () => {
+        const slots = [
+            makeSlot("ECS", {
+                "036B": {
+                    "001": makeSection(null, [
+                        makeMeeting("LEC", ["M"], 1000, 1100),
+                        makeMeeting("FINAL", ["2026-06-05"], 1030, 1230)
+                    ])
+                }
+            }),
+            makeSlot("PHY", {
+                "009B": {
+                    "001": makeSection(null, [
+                        makeMeeting("LEC", ["T"], 1000, 1100),
+                        makeMeeting("FINAL", ["2026-06-12"], 1030, 1230) // same time, different date
+                    ])
+                }
+            })
+        ];
+
+        const results = createAllPossibleSchedules(slots);
+        expect(results).toHaveLength(1);
+    });
 });
