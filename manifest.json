@@ -20,7 +20,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["html-files/main-panel.html"],
+      "resources": ["html-files/main-panel.html", "images/*"],
       "matches": ["<all_urls>"]
     }
   ],

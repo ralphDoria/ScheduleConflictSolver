@@ -20,6 +20,7 @@ if (div_leftContainer != null) {
     fetch(chrome.runtime.getURL("html-files/main-panel.html"))
         .then(r => r.text())
         .then(html => {
+            html = html.replace(/src="\.\.\/images\//g, `src="${chrome.runtime.getURL('images/')}`);
             div_leftContainer.insertAdjacentHTML("afterbegin", html);
 
             // State
@@ -135,6 +136,14 @@ if (div_leftContainer != null) {
                 document.querySelectorAll("#scs-dots .scs-dot").forEach(dot => {
                     dot.classList.toggle("scs-dot-active", parseInt(dot.dataset.phase) === n);
                 });
+
+                const phaseLabel = document.getElementById("scs-phase-label");
+                const phaseLabels = {
+                    1: "Course Search",
+                    2: "Refine search results & Add Custom Time Blocks",
+                    3: "View Results"
+                };
+                phaseLabel.textContent = phaseLabels[n] || "";
 
                 const backBtn = document.getElementById("scs-back-btn");
                 const fwdBtn = document.getElementById("scs-fwd-btn");

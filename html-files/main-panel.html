@@ -77,8 +77,9 @@
     .scs-dot.scs-dot-active { background: #5a7fa8; }
 </style>
 <div id="scs-container" style="background-color: #ECF0F5; border: 1px solid #CCD4E0; margin-bottom: 15px; padding: 10px; font-family: sans-serif; font-size: 13px;">
-    <div style="font-weight: bold; font-size: 15px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #CCD4E0;">
-        Schedule Conflict Solver v1.0
+    <div style="font-weight: bold; font-size: 15px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #CCD4E0; display: flex; align-items: center; gap: 8px;">
+        <img src="../images/ScheduleBobLogoZoomed.png" alt="ScheduleBob Logo" style="height: 28px; width: auto; flex-shrink: 0;">
+        <span>Automatic Schedule Builder & Course Conflict Solver</span>
     </div>
     <div id="scs-course-section">
         <table id="scs-course-table" style="border-collapse: collapse; width: 100%;">
@@ -109,6 +110,7 @@
         </div>
     </div>
     <div id="scs-nav">
+        <div id="scs-phase-label" style="font-weight: bold; font-size: 13px; color: #333; margin-bottom: 8px; min-height: 16px;">Course Search</div>
         <div id="scs-nav-btns">
             <button id="scs-back-btn" class="scs-nav-btn">&#8249; Back</button>
             <button id="scs-fwd-btn" class="scs-nav-btn">Next &#8250;<span id="scs-fwd-tooltip" class="scs-nav-tooltip"></span></button>
