@@ -81,3 +81,7 @@ function createAllPossibleSchedules(courseSlots) {
     backtrack(0, []);
     return results;
 }
+
+if (typeof module !== "undefined") {
+    module.exports = { flattenSlot, meetingPairConflicts, meetingsConflict, createAllPossibleSchedules };
+}

@@ -45,3 +45,7 @@ function extractLectureGroup(seqNum) {
     const match = seqNum.match(/^([A-Za-z]+)/);
     return match ? match[1] : null;
 }
+
+if (typeof module !== "undefined") {
+    module.exports = { parseCourseSlot, extractLectureGroup };
+}
