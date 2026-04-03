@@ -385,3 +385,100 @@ describe("createAllPossibleSchedules", () => {
         expect(results).toHaveLength(1);
     });
 });
+
+describe("createAllPossibleSchedules with timeblocks", () => {
+    test("timeblock blocks a section that overlaps it", () => {
+        const slots = [
+            makeSlot("ECS", {
+                "036B": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["M", "W"], 1000, 1100)]),
+                    "002": makeSection(null, [makeMeeting("LEC", ["T", "R"], 1000, 1100)])
+                }
+            }),
+            makeSlot("PHY", {
+                "009B": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["F"], 900, 1000)])
+                }
+            })
+        ];
+
+        const timeblocks = [
+            makeMeeting("TIMEBLOCK", ["M"], 1030, 1130)
+        ];
+
+        const results = createAllPossibleSchedules(slots, timeblocks);
+        // Section 001 conflicts with timeblock on Monday; only 002 survives
+        expect(results).toHaveLength(1);
+        expect(results[0][0].seqNum).toBe("002");
+    });
+
+    test("empty timeblocks array does not affect results", () => {
+        const slots = [
+            makeSlot("ECS", {
+                "036B": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["M"], 1000, 1100)])
+                }
+            }),
+            makeSlot("PHY", {
+                "009B": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["T"], 1000, 1100)])
+                }
+            })
+        ];
+
+        const results = createAllPossibleSchedules(slots, []);
+        expect(results).toHaveLength(1);
+    });
+
+    test("timeblock on different day does not block", () => {
+        const slots = [
+            makeSlot("ECS", {
+                "036B": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["M"], 1000, 1100)])
+                }
+            }),
+            makeSlot("PHY", {
+                "009B": {
+                    "001": makeSection(null, [makeMeeting("LEC", ["T"], 1000, 1100)])
+                }
+            })
+        ];
+
+        const timeblocks = [
+            makeMeeting("TIMEBLOCK", ["W"], 1000, 1100)
+        ];
+
+        const results = createAllPossibleSchedules(slots, timeblocks);
+        expect(results).toHaveLength(1);
+    });
+
+    test("timeblock prunes entire lecture group", () => {
+        const slots = [
+            makeSlot("ECS", {
+                "036B": {
+                    "A01": makeSection("A", [
+                        makeMeeting("LEC", ["M"], 1000, 1100),
+                        makeMeeting("DIS", ["W"], 1400, 1500)
+                    ]),
+                    "A02": makeSection("A", [
+                        makeMeeting("LEC", ["M"], 1000, 1100),
+                        makeMeeting("DIS", ["R"], 1400, 1500)
+                    ]),
+                    "B01": makeSection("B", [
+                        makeMeeting("LEC", ["T"], 1000, 1100),
+                        makeMeeting("DIS", ["F"], 1400, 1500)
+                    ])
+                }
+            })
+        ];
+
+        const timeblocks = [
+            makeMeeting("TIMEBLOCK", ["M"], 1030, 1130)
+        ];
+
+        const results = createAllPossibleSchedules(slots, timeblocks);
+        // Group A lecture conflicts with timeblock; only B01 survives
+        expect(results).toHaveLength(1);
+        expect(results[0][0].seqNum).toBe("B01");
+    });
+});

@@ -3,6 +3,7 @@
     .scs-help-tooltip { display: none; position: absolute; left: 50%; top: 16px; transform: translateX(-50%); width: 200px; background: #333; color: #fff; font-size: 11px; font-weight: normal; padding: 6px 8px; border-radius: 4px; z-index: 9999; line-height: 1.4; white-space: normal; }
     .scs-help-icon:hover .scs-help-tooltip { display: block; }
     .scs-phase-1 .scs-checkbox-col { display: none; }
+    .scs-phase-2 .scs-checkbox-col { display: none; }
     .scs-phase-2 .scs-delete-col { display: none; }
     .scs-phase-3 #scs-course-table { display: none; }
     .scs-phase-2 #scs-add-btn, .scs-phase-3 #scs-add-btn { display: none; }
@@ -41,6 +42,35 @@
     #scs-results-table th, #scs-results-table td { padding: 4px 8px; border: 1px solid #CCD4E0; text-align: center; }
     #scs-results-table th { background: #e2e7ef; font-weight: bold; position: sticky; top: 0; }
     #scs-results-table td { background: #fff; }
+    #scs-timeblocks { display: none; margin-top: 10px; }
+    .scs-phase-2 #scs-timeblocks { display: block; }
+    #scs-tb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #CCD4E0; }
+    #scs-tb-header span { font-weight: bold; font-size: 13px; }
+    #scs-tb-add { cursor: pointer; background: #5a7fa8; color: #fff; border: none; border-radius: 3px; padding: 2px 8px; font-size: 13px; }
+    .scs-tb-entry { background: #fff; border: 1px solid #CCD4E0; border-radius: 4px; padding: 8px; margin-bottom: 6px; }
+    .scs-tb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .scs-tb-row:last-child { margin-bottom: 0; }
+    .scs-tb-label { font-size: 11px; color: #666; flex-shrink: 0; }
+    .scs-tb-name { flex: 1; padding: 3px 5px; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 12px; min-width: 0; }
+    .scs-tb-delete { cursor: pointer; background: none; border: none; font-size: 14px; color: #888; padding: 0 2px; flex-shrink: 0; }
+    .scs-tb-delete:hover { color: #c44; }
+    .scs-tb-time-group { display: inline-flex; align-items: center; gap: 2px; }
+    .scs-tb-spinner { width: 36px; padding: 2px 2px; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 12px; text-align: center; -moz-appearance: textfield; }
+    .scs-tb-spinner::-webkit-inner-spin-button, .scs-tb-spinner::-webkit-outer-spin-button { opacity: 1; }
+    .scs-tb-colon { font-size: 12px; font-weight: bold; }
+    .scs-tb-ampm { display: inline-flex; border: 1px solid #CCD4E0; border-radius: 3px; overflow: hidden; }
+    .scs-tb-ampm-btn { padding: 2px 6px; font-size: 10px; cursor: pointer; background: #fff; border: none; color: #888; }
+    .scs-tb-ampm-btn.scs-tb-ampm-active { background: #5a7fa8; color: #fff; }
+    .scs-tb-date { padding: 2px 4px; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 11px; }
+    .scs-tb-days { display: inline-flex; gap: 3px; }
+    .scs-tb-day { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer; background: #fff; color: #888; user-select: none; }
+    .scs-tb-day.scs-tb-day-active { background: #5a7fa8; color: #fff; border-color: #5a7fa8; }
+    .scs-tb-entry.scs-tb-collapsed .scs-tb-body { display: none; }
+    .scs-tb-summary { display: none; font-size: 11px; color: #555; flex: 1; min-width: 0; cursor: pointer; }
+    .scs-tb-entry.scs-tb-collapsed .scs-tb-summary { display: block; }
+    .scs-tb-entry.scs-tb-collapsed .scs-tb-name { display: none; }
+    .scs-tb-collapse { display: block; width: 100%; padding: 2px 0; margin-top: 4px; cursor: pointer; background: none; border: none; border-top: 1px solid #CCD4E0; font-size: 10px; color: #888; text-align: center; }
+    .scs-tb-collapse:hover { color: #5a7fa8; }
     #scs-dots { display: flex; gap: 5px; }
     #scs-course-rows .scs-course-row:nth-child(even) { background-color: #e4e9f0; }
     .scs-dot { width: 7px; height: 7px; border-radius: 50%; background: #CCD4E0; }
@@ -70,6 +100,13 @@
         </table>
         <button id="scs-add-btn" style="width: 100%; padding: 4px 0; margin-top: 4px; cursor: pointer; font-size: 16px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px;">+</button>
         <div id="scs-computed-placeholder">Computed Schedules go here</div>
+        <div id="scs-timeblocks">
+            <div id="scs-tb-header">
+                <span>Custom Timeblocks</span>
+                <button id="scs-tb-add">+</button>
+            </div>
+            <div id="scs-tb-entries"></div>
+        </div>
     </div>
     <div id="scs-nav">
         <div id="scs-nav-btns">

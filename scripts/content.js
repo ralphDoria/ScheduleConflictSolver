@@ -365,7 +365,8 @@ if (div_leftContainer != null) {
                 });
 
                 // Compute schedules
-                const schedules = createAllPossibleSchedules(refinedSlots);
+                const timeblocks = parseCustomTimeBlocks();
+                const schedules = createAllPossibleSchedules(refinedSlots, timeblocks);
                 const placeholder = document.getElementById("scs-computed-placeholder");
 
                 if (schedules.length === 0) {
@@ -420,6 +421,78 @@ if (div_leftContainer != null) {
                 parsedSlots = [];
                 scsUpdateRowNumbers();
                 scsShowPhase(1);
+            }
+
+            // --- Timeblock UI ---
+
+            function scsCreateTimeblock() {
+                const entry = document.createElement("div");
+                entry.className = "scs-tb-entry";
+                entry.innerHTML = `
+                    <div class="scs-tb-row scs-tb-header-row">
+                        <button class="scs-tb-delete" title="Remove timeblock">&#128465;</button>
+                        <span class="scs-tb-summary"></span>
+                        <input class="scs-tb-name" type="text" placeholder="e.g. Club Meeting">
+                    </div>
+                    <div class="scs-tb-body">
+                        <div class="scs-tb-row">
+                            <span class="scs-tb-label">Start:</span>
+                            <span class="scs-tb-time-group">
+                                <input class="scs-tb-spinner scs-tb-hour" type="number" min="1" max="12" value="12">
+                                <span class="scs-tb-colon">:</span>
+                                <input class="scs-tb-spinner scs-tb-min" type="number" min="0" max="59" value="00" step="5">
+                                <span class="scs-tb-ampm">
+                                    <button class="scs-tb-ampm-btn scs-tb-ampm-active" data-val="AM">AM</button>
+                                    <button class="scs-tb-ampm-btn" data-val="PM">PM</button>
+                                </span>
+                            </span>
+                            <span class="scs-tb-label">End:</span>
+                            <span class="scs-tb-time-group">
+                                <input class="scs-tb-spinner scs-tb-hour" type="number" min="1" max="12" value="1">
+                                <span class="scs-tb-colon">:</span>
+                                <input class="scs-tb-spinner scs-tb-min" type="number" min="0" max="59" value="00" step="5">
+                                <span class="scs-tb-ampm">
+                                    <button class="scs-tb-ampm-btn" data-val="AM">AM</button>
+                                    <button class="scs-tb-ampm-btn scs-tb-ampm-active" data-val="PM">PM</button>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="scs-tb-row">
+                            <span class="scs-tb-label">Start Date:</span>
+                            <input class="scs-tb-date" type="date">
+                            <span class="scs-tb-label">End Date:</span>
+                            <input class="scs-tb-date" type="date">
+                        </div>
+                        <div class="scs-tb-row">
+                            <span class="scs-tb-label">Recurrence:</span>
+                            <span class="scs-tb-days">
+                                <span class="scs-tb-day" data-day="M">M</span>
+                                <span class="scs-tb-day" data-day="T">T</span>
+                                <span class="scs-tb-day" data-day="W">W</span>
+                                <span class="scs-tb-day" data-day="R">R</span>
+                                <span class="scs-tb-day" data-day="F">F</span>
+                                <span class="scs-tb-day" data-day="S">S</span>
+                            </span>
+                        </div>
+                    </div>
+                    <button class="scs-tb-collapse">&#9650; Collapse</button>
+                `;
+                return entry;
+            }
+
+            function scsUpdateTbSummary(entry) {
+                const summary = entry.querySelector(".scs-tb-summary");
+                const name = entry.querySelector(".scs-tb-name").value.trim() || "Untitled";
+                const timeGroups = entry.querySelectorAll(".scs-tb-time-group");
+                const times = Array.from(timeGroups).map(g => {
+                    const h = g.querySelector(".scs-tb-hour").value;
+                    const m = g.querySelector(".scs-tb-min").value.padStart(2, "0");
+                    const ampm = g.querySelector(".scs-tb-ampm-active").dataset.val;
+                    return h + ":" + m + " " + ampm;
+                });
+                const days = Array.from(entry.querySelectorAll(".scs-tb-day.scs-tb-day-active"))
+                    .map(d => d.dataset.day).join("");
+                summary.textContent = name + " \u2022 " + times[0] + "\u2013" + times[1] + (days ? " \u2022 " + days : "");
             }
 
             // --- Init ---
@@ -541,6 +614,67 @@ if (div_leftContainer != null) {
                     document.querySelectorAll(".scs-course-card.scs-dropdown-open").forEach(c => {
                         c.classList.remove("scs-dropdown-open");
                     });
+                }
+            });
+
+            // Timeblock handlers
+            const tbEntries = document.getElementById("scs-tb-entries");
+
+            document.getElementById("scs-tb-add").addEventListener("click", () => {
+                tbEntries.appendChild(scsCreateTimeblock());
+            });
+
+            tbEntries.addEventListener("click", (e) => {
+                // Delete timeblock
+                const delBtn = e.target.closest(".scs-tb-delete");
+                if (delBtn) {
+                    delBtn.closest(".scs-tb-entry").remove();
+                    return;
+                }
+
+                // Collapse/expand toggle
+                const collapseBtn = e.target.closest(".scs-tb-collapse");
+                if (collapseBtn) {
+                    const entry = collapseBtn.closest(".scs-tb-entry");
+                    const isCollapsed = entry.classList.toggle("scs-tb-collapsed");
+                    collapseBtn.innerHTML = isCollapsed ? "&#9660; Expand" : "&#9650; Collapse";
+                    if (isCollapsed) scsUpdateTbSummary(entry);
+                    return;
+                }
+
+                // Clicking summary expands
+                const summary = e.target.closest(".scs-tb-summary");
+                if (summary) {
+                    const entry = summary.closest(".scs-tb-entry");
+                    if (entry.classList.contains("scs-tb-collapsed")) {
+                        entry.classList.remove("scs-tb-collapsed");
+                        entry.querySelector(".scs-tb-collapse").innerHTML = "&#9650; Collapse";
+                    }
+                    return;
+                }
+
+                // AM/PM toggle
+                const ampmBtn = e.target.closest(".scs-tb-ampm-btn");
+                if (ampmBtn) {
+                    const group = ampmBtn.closest(".scs-tb-ampm");
+                    group.querySelectorAll(".scs-tb-ampm-btn").forEach(b => b.classList.remove("scs-tb-ampm-active"));
+                    ampmBtn.classList.add("scs-tb-ampm-active");
+                    return;
+                }
+
+                // Day toggle
+                const dayBox = e.target.closest(".scs-tb-day");
+                if (dayBox) {
+                    dayBox.classList.toggle("scs-tb-day-active");
+                    return;
+                }
+            });
+
+            // Pad minute spinner to 2 digits on blur
+            tbEntries.addEventListener("change", (e) => {
+                if (e.target.classList.contains("scs-tb-min")) {
+                    const val = parseInt(e.target.value) || 0;
+                    e.target.value = val.toString().padStart(2, "0");
                 }
             });
 

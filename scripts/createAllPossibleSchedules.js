@@ -36,7 +36,17 @@ function meetingsConflict(meetingsA, meetingsB) {
     return false;
 }
 
-function createAllPossibleSchedules(courseSlots) {
+function conflictsWithTimeblocks(meetings, timeblocks) {
+    for (const meeting of meetings) {
+        for (const tb of timeblocks) {
+            if (meetingPairConflicts(meeting, tb)) return true;
+        }
+    }
+    return false;
+}
+
+function createAllPossibleSchedules(courseSlots, timeblocks) {
+    if (!timeblocks) timeblocks = [];
     const slotOptions = courseSlots.map(flattenSlot);
     const results = [];
 
@@ -70,13 +80,18 @@ function createAllPossibleSchedules(courseSlots) {
                 if (conflictedGroups.has(groupKey)) continue;
 
                 const lecMeetings = option.meetings.filter(m => m.type === "LEC");
-                if (lecMeetings.length > 0 && conflictsWithSelected(lecMeetings, selected)) {
-                    conflictedGroups.add(groupKey);
-                    continue;
+                if (lecMeetings.length > 0) {
+                    if (conflictsWithTimeblocks(lecMeetings, timeblocks) || conflictsWithSelected(lecMeetings, selected)) {
+                        conflictedGroups.add(groupKey);
+                        continue;
+                    }
                 }
             }
 
-            // Full conflict check
+            // Timeblock conflict check
+            if (conflictsWithTimeblocks(option.meetings, timeblocks)) continue;
+
+            // Full conflict check against selected
             if (conflictsWithSelected(option.meetings, selected)) continue;
 
             selected.push(option);
@@ -90,5 +105,5 @@ function createAllPossibleSchedules(courseSlots) {
 }
 
 if (typeof module !== "undefined") {
-    module.exports = { flattenSlot, flattenSingleSlot, meetingPairConflicts, meetingsConflict, createAllPossibleSchedules };
+    module.exports = { flattenSlot, flattenSingleSlot, meetingPairConflicts, meetingsConflict, conflictsWithTimeblocks, createAllPossibleSchedules };
 }
