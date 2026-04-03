@@ -9,4 +9,6 @@ Given your preferences for courses, from general (e.g. I just want any philosoph
 ~~1. Forgot to consider overlapping final exams. Add final exam time to meetings when parsing, and consider that in the algorithmm~~
 ~~1. UI to enter & label timeblocks for algorithm to avoid conflicts w/ (e.g. club meeting) in phase 2~~
 1. add an import current schedule button to the 1st phase. Add an export schedule button on the 3rd phase
+    * create & delete schedules (perhaps script injection? bc need to use host site's browser source code)
+    * read current schedule
 1. Make logo and submit to chrome store

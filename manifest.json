@@ -3,9 +3,14 @@
   "description": "An automatic schedule builder & course conflict solver for UC Davis's ScheduleBuilder",
   "version": "1.0",
   "manifest_version": 3,
+  "icons": {
+    "16": "images/ScheduleBobLogoGrounded.png",
+    "48": "images/ScheduleBobLogoGrounded.png",
+    "128": "images/ScheduleBobLogoGrounded.png"
+  },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_icon": "images/hello_extension_icon.png"
+    "default_icon": "images/ScheduleBobLogoGrounded.png"
   },
   "content_scripts": [
     {
