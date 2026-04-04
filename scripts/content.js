@@ -563,6 +563,16 @@ if (div_leftContainer != null) {
                 scsValidatePhase1();
             });
 
+            // Clear all rows
+            document.getElementById("scs-clear-btn").addEventListener("click", () => {
+                tbody.innerHTML = "";
+                tbody.appendChild(scsCreateRow());
+                tbody.appendChild(scsCreateRow());
+                scsUpdateRowNumbers();
+                scsUpdateRemoveButtons();
+                scsValidatePhase1();
+            });
+
             // Remove row / multi-input interactions
             tbody.addEventListener("click", (e) => {
                 // Multi-input add button
