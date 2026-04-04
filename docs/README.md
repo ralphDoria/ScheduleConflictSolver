@@ -6,9 +6,10 @@ Description: ScheduleBob is an automatic schedule builder & course conflict solv
 Given your preferences for courses, from general (e.g. I just want any philosophy course that fits into my current schedule) to specific (e.g. I want to keep this exact course and section because my friends are in it), it'll find all possible, conflict-free schedules for you to choose from.
 
 ### MVP todo list (to get plugin on chrome store asap)
-~~1. Make logo and submit to chrome store~~
-~~1. need to dynamically get term code~~
-~~1. Fix up popup, have it prompt user to go to Schedule Builder, with the link being `https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=`~~
 1. add an import current schedule button to the 1st phase. Add an export schedule button on the 3rd phase
     * create & delete schedules (perhaps script injection? bc need to use host site's browser source code)
     * read current schedule
+
+### Features after mvp
+* If no schedules are found due to schedule conflicts, suggest to the user to make their course earch more flexible by, for example, broadening the search for a course slot or adding more options.
+    * at this stage, give option for smart suggestions. Ask them which course slot they'd like to 
