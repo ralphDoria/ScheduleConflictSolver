@@ -13,3 +13,8 @@ Given your preferences for courses, from general (e.g. I just want any philosoph
 ### Features after mvp
 * If no schedules are found due to schedule conflicts, suggest to the user to make their course earch more flexible by, for example, broadening the search for a course slot or adding more options.
     * at this stage, give option for smart suggestions. Ask them which course slot they'd like to 
+* Schedule analysis:
+    * for each course in the included, pull in rate my professor ratings for the instructor and attach it. Then when displaying all the different schedules, calculate stats for that schedule, such as min, max, and average rating for each schedule. (Make this a freemium feature?)
+    *  
+* Adjustable Overlap Leniency for being considered an overlap
+    * Then with this feature, provide the user with professor emails so that they can email for PTAs (Credit to Lucas for the idea)

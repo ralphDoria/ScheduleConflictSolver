@@ -13,17 +13,23 @@ const bridgeScript = document.createElement("script");
 bridgeScript.src = chrome.runtime.getURL("scripts/bridge.js");
 document.documentElement.appendChild(bridgeScript);
 
-// Listen for responses from the bridge
-window.addEventListener("message", (event) => {
-    if (event.source !== window || event.data.type !== "SCHEDULES_REQUEST") return;
-    console.log("Schedules received from page:", event.data.data);
-});
+async function getCurrentScheduleCourseNames(thisScheduleName, schedules) {
+    const schedule = schedules.find(s => s.Name === thisScheduleName);
+    if (!schedule) return [];
 
-// Test: request the Schedules variable from the page
-console.log("ContentJS: Sending GET_SCHEDULES message.")
-setInterval(() => {
-    window.postMessage({ type: "GET_SCHEDULES" });
-}, 1000);
+    const crns = [];
+    for (const value of Object.values(schedule.SelectedList)) {
+        crns.push(value.ConsentOfInstructorCRN);
+    }
+
+    const results = await Promise.all(
+        crns.map(crn => search(String(crn), "", userPidm, termCode))
+    );
+
+    return results
+        .filter(data => data && data.length > 0)
+        .map(data => data[0].course.shortDesc);
+}
 
 // Getting left container and injecting our own html within it
 let div_leftContainer = document.getElementById("LeftContainer");
@@ -534,6 +540,24 @@ if (div_leftContainer != null) {
                 const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
                 if (rows.length >= SCS_MAX_ROWS) return;
                 tbody.appendChild(scsCreateRow());
+                scsUpdateRowNumbers();
+                scsUpdateRemoveButtons();
+                scsValidatePhase1();
+            });
+
+            // Import current schedule
+            document.getElementById("scs-import-btn").addEventListener("click", async () => {
+                const { schedules, currentScheduleName } = await requestFromPage(PAGE_MESSAGES.GET_SCHEDULE_DATA);
+                const courseNames = await getCurrentScheduleCourseNames(currentScheduleName, schedules);
+                if (courseNames.length === 0) return;
+
+                // Clear existing rows and create one per course
+                tbody.innerHTML = "";
+                courseNames.forEach(name => {
+                    const row = scsCreateRow();
+                    row.querySelector(".scs-multi-input input[type='text']").value = name;
+                    tbody.appendChild(row);
+                });
                 scsUpdateRowNumbers();
                 scsUpdateRemoveButtons();
                 scsValidatePhase1();
