@@ -51,6 +51,12 @@ if (div_leftContainer != null) {
             let parsedSlots = []; // array of parseCourseSlot results, indexed by row
             let rowQueries = []; // search queries from phase 1, indexed by row
 
+            // --- Loading overlay ---
+
+            const scsOverlay = document.getElementById("scs-loading-overlay");
+            function scsShowLoading() { scsOverlay.classList.add("scs-loading-active"); }
+            function scsHideLoading() { scsOverlay.classList.remove("scs-loading-active"); }
+
             // --- Row creation ---
 
             function scsCreateInputEntry() {
@@ -186,6 +192,7 @@ if (div_leftContainer != null) {
             }
 
             function scsEnterPhase2() {
+                scsShowLoading();
                 rowQueries = [];
                 parsedSlots = [];
 
@@ -298,6 +305,7 @@ if (div_leftContainer != null) {
                     });
 
                     scsShowPhase(2);
+                    scsHideLoading();
                 });
             }
 
@@ -346,85 +354,90 @@ if (div_leftContainer != null) {
             }
 
             function scsEnterPhase3() {
-                // Refine parsed data based on section-level toggle state
-                const refinedSlots = [];
-                const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
+                scsShowLoading();
+                // Use requestAnimationFrame to let the browser paint the overlay before computing
+                requestAnimationFrame(() => { setTimeout(() => {
+                    // Refine parsed data based on section-level toggle state
+                    const refinedSlots = [];
+                    const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
 
-                rows.forEach((row, i) => {
-                    const slot = parsedSlots[i];
-                    if (!slot) return;
-                    const slotList = Array.isArray(slot) ? slot : [slot];
+                    rows.forEach((row, i) => {
+                        const slot = parsedSlots[i];
+                        if (!slot) return;
+                        const slotList = Array.isArray(slot) ? slot : [slot];
 
-                    const checkedBoxes = document.querySelectorAll(`.scs-section-dropdown input[type="checkbox"][data-row="${i}"]:checked`);
-                    if (checkedBoxes.length === 0) return;
+                        const checkedBoxes = document.querySelectorAll(`.scs-section-dropdown input[type="checkbox"][data-row="${i}"]:checked`);
+                        if (checkedBoxes.length === 0) return;
 
-                    // Group checked sections by subjectCode
-                    const bySubject = {};
-                    checkedBoxes.forEach(cb => {
-                        const sc = cb.dataset.subjectCode;
-                        const courseNum = cb.dataset.courseNum;
-                        const seqNum = cb.dataset.seqNum;
-                        if (!bySubject[sc]) bySubject[sc] = {};
-                        if (!bySubject[sc][courseNum]) bySubject[sc][courseNum] = [];
-                        bySubject[sc][courseNum].push(seqNum);
-                    });
+                        // Group checked sections by subjectCode
+                        const bySubject = {};
+                        checkedBoxes.forEach(cb => {
+                            const sc = cb.dataset.subjectCode;
+                            const courseNum = cb.dataset.courseNum;
+                            const seqNum = cb.dataset.seqNum;
+                            if (!bySubject[sc]) bySubject[sc] = {};
+                            if (!bySubject[sc][courseNum]) bySubject[sc][courseNum] = [];
+                            bySubject[sc][courseNum].push(seqNum);
+                        });
 
-                    // Build refined slot(s) by looking up section data from parsed slot
-                    const refinedForRow = [];
-                    for (const [sc, courseNums] of Object.entries(bySubject)) {
-                        const source = slotList.find(s => s.subjectCode === sc);
-                        if (!source) continue;
-                        const refinedCourseNums = {};
-                        for (const [cn, seqNums] of Object.entries(courseNums)) {
-                            if (!source.courseNums[cn]) continue;
-                            refinedCourseNums[cn] = {};
-                            for (const sn of seqNums) {
-                                if (source.courseNums[cn][sn]) {
-                                    refinedCourseNums[cn][sn] = source.courseNums[cn][sn];
+                        // Build refined slot(s) by looking up section data from parsed slot
+                        const refinedForRow = [];
+                        for (const [sc, courseNums] of Object.entries(bySubject)) {
+                            const source = slotList.find(s => s.subjectCode === sc);
+                            if (!source) continue;
+                            const refinedCourseNums = {};
+                            for (const [cn, seqNums] of Object.entries(courseNums)) {
+                                if (!source.courseNums[cn]) continue;
+                                refinedCourseNums[cn] = {};
+                                for (const sn of seqNums) {
+                                    if (source.courseNums[cn][sn]) {
+                                        refinedCourseNums[cn][sn] = source.courseNums[cn][sn];
+                                    }
                                 }
                             }
+                            if (Object.keys(refinedCourseNums).length > 0) {
+                                refinedForRow.push({ subjectCode: sc, courseNums: refinedCourseNums });
+                            }
                         }
-                        if (Object.keys(refinedCourseNums).length > 0) {
-                            refinedForRow.push({ subjectCode: sc, courseNums: refinedCourseNums });
+
+                        if (refinedForRow.length === 1) {
+                            refinedSlots.push(refinedForRow[0]);
+                        } else if (refinedForRow.length > 1) {
+                            refinedSlots.push(refinedForRow);
                         }
-                    }
-
-                    if (refinedForRow.length === 1) {
-                        refinedSlots.push(refinedForRow[0]);
-                    } else if (refinedForRow.length > 1) {
-                        refinedSlots.push(refinedForRow);
-                    }
-                });
-
-                // Compute schedules
-                const timeblocks = parseCustomTimeBlocks();
-                const schedules = createAllPossibleSchedules(refinedSlots, timeblocks);
-                const placeholder = document.getElementById("scs-computed-placeholder");
-
-                if (schedules.length === 0) {
-                    placeholder.innerHTML = "<p>No conflict-free schedules found.</p>";
-                } else {
-                    // Build table: rows = slot numbers, columns = schedules
-                    const numSlots = schedules[0].length;
-                    let tableHTML = `<p style="font-weight: bold; font-style: normal; color: #333; margin-bottom: 6px;">${schedules.length} schedule(s) found:</p>`;
-                    tableHTML += '<div class="scs-results-scroll"><table id="scs-results-table"><thead><tr><th>Slot</th>';
-                    schedules.forEach((_, i) => {
-                        tableHTML += `<th>Schedule ${i + 1}</th>`;
                     });
-                    tableHTML += '</tr></thead><tbody>';
-                    for (let s = 0; s < numSlots; s++) {
-                        tableHTML += `<tr><td style="font-weight: bold;">${s + 1}</td>`;
-                        schedules.forEach(schedule => {
-                            const entry = schedule[s];
-                            tableHTML += `<td>${entry.subjectCode} ${entry.courseNum} ${entry.seqNum}</td>`;
-                        });
-                        tableHTML += '</tr>';
-                    }
-                    tableHTML += '</tbody></table></div>';
-                    placeholder.innerHTML = tableHTML;
-                }
 
-                scsShowPhase(3);
+                    // Compute schedules
+                    const timeblocks = parseCustomTimeBlocks();
+                    const schedules = createAllPossibleSchedules(refinedSlots, timeblocks);
+                    const placeholder = document.getElementById("scs-computed-placeholder");
+
+                    if (schedules.length === 0) {
+                        placeholder.innerHTML = "<p>No conflict-free schedules found.</p>";
+                    } else {
+                        // Build table: rows = slot numbers, columns = schedules
+                        const numSlots = schedules[0].length;
+                        let tableHTML = `<p style="font-weight: bold; font-style: normal; color: #333; margin-bottom: 6px;">${schedules.length} schedule(s) found:</p>`;
+                        tableHTML += '<div class="scs-results-scroll"><table id="scs-results-table"><thead><tr><th>Slot</th>';
+                        schedules.forEach((_, i) => {
+                            tableHTML += `<th>Schedule ${i + 1}</th>`;
+                        });
+                        tableHTML += '</tr></thead><tbody>';
+                        for (let s = 0; s < numSlots; s++) {
+                            tableHTML += `<tr><td style="font-weight: bold;">${s + 1}</td>`;
+                            schedules.forEach(schedule => {
+                                const entry = schedule[s];
+                                tableHTML += `<td>${entry.subjectCode} ${entry.courseNum} ${entry.seqNum}</td>`;
+                            });
+                            tableHTML += '</tr>';
+                        }
+                        tableHTML += '</tbody></table></div>';
+                        placeholder.innerHTML = tableHTML;
+                    }
+
+                    scsShowPhase(3);
+                    scsHideLoading();
+                }, 0); });
             }
 
             function scsBackToPhase1() {

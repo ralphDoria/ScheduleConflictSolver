@@ -77,8 +77,13 @@
     #scs-course-rows .scs-course-row:nth-child(even) { background-color: #e4e9f0; }
     .scs-dot { width: 7px; height: 7px; border-radius: 50%; background: #CCD4E0; }
     .scs-dot.scs-dot-active { background: #5a7fa8; }
+    #scs-loading-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 10000; align-items: center; justify-content: center; border-radius: inherit; }
+    #scs-loading-overlay.scs-loading-active { display: flex; }
+    @keyframes scs-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    #scs-loading-overlay img { width: 48px; height: 48px; animation: scs-spin 1s linear infinite; }
 </style>
-<div id="scs-container" style="background-color: #ECF0F5; border: 1px solid #CCD4E0; margin-bottom: 15px; padding: 10px; font-family: sans-serif; font-size: 13px;">
+<div id="scs-container" style="position: relative; background-color: #ECF0F5; border: 1px solid #CCD4E0; margin-bottom: 15px; padding: 10px; font-family: sans-serif; font-size: 13px;">
+    <div id="scs-loading-overlay"><img src="../images/ScheduleBobLogoFull.png" alt="Loading..."></div>
     <div style="font-weight: bold; font-size: 15px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #CCD4E0; display: flex; align-items: center; gap: 8px;">
         <img src="../images/ScheduleBobLogoZoomed.png" alt="ScheduleBob Logo" style="height: 28px; width: auto; flex-shrink: 0;">
         <span>Automatic Schedule Builder & Course Conflict Solver</span>
