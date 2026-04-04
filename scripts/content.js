@@ -8,6 +8,23 @@ getPidm().then(pidm => {
     userPidm = pidm;
 });
 
+// Inject bridge script into page world to access host-page variables
+const bridgeScript = document.createElement("script");
+bridgeScript.src = chrome.runtime.getURL("scripts/bridge.js");
+document.documentElement.appendChild(bridgeScript);
+
+// Listen for responses from the bridge
+window.addEventListener("message", (event) => {
+    if (event.source !== window || event.data.type !== "SCHEDULES_REQUEST") return;
+    console.log("Schedules received from page:", event.data.data);
+});
+
+// Test: request the Schedules variable from the page
+console.log("ContentJS: Sending GET_SCHEDULES message.")
+setInterval(() => {
+    window.postMessage({ type: "GET_SCHEDULES" });
+}, 1000);
+
 // Getting left container and injecting our own html within it
 let div_leftContainer = document.getElementById("LeftContainer");
 if (div_leftContainer == null) {

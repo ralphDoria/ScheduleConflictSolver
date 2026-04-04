@@ -1,7 +1,7 @@
 {
   "name": "ScheduleBob",
   "description": "An automatic schedule builder & course conflict solver for UC Davis's ScheduleBuilder",
-  "version": "1.0",
+  "version": "1.1",
   "manifest_version": 3,
   "icons": {
     "16": "images/ScheduleBobLogoZoomed.png",
@@ -15,15 +15,22 @@
   "content_scripts": [
     {
       "matches": ["https://my.ucdavis.edu/schedulebuilder/index.cfm?termCode=*"],
-      "js": ["scripts/getTermCode.js", "scripts/getPidm.js", "scripts/search.js", "scripts/parseData.js", "scripts/parseCustomTimeBlocks.js", "scripts/createAllPossibleSchedules.js", "scripts/content.js"]
+      "js": [
+        "scripts/getTermCode.js",
+        "scripts/getPidm.js",
+        "scripts/search.js",
+        "scripts/parseData.js",
+        "scripts/parseCustomTimeBlocks.js",
+        "scripts/createAllPossibleSchedules.js",
+        "scripts/content.js"
+      ]
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["html-files/main-panel.html", "images/*"],
+      "resources": ["html-files/main-panel.html", "images/*", "scripts/bridge.js"],
       "matches": ["<all_urls>"]
     }
   ],
-  "permissions": ["scripting"],
   "host_permissions": ["https://my.ucdavis.edu/schedulebuilder"]
 }
