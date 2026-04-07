@@ -67,7 +67,35 @@ if (div_leftContainer != null) {
             // State
             let scsCurrentPhase = 1;
             let parsedSlots = []; // array of parseCourseSlot results, indexed by row
-            let rowQueries = []; // search queries from phase 1, indexed by row
+
+            // --- Search cache (LRU, 20 entries) ---
+            const SCS_CACHE_MAX = 20;
+            const searchCache = new Map(); // key = lowercase query, value = raw API data array
+
+            function scsCacheLookup(query) {
+                const key = query.toLowerCase();
+                if (!searchCache.has(key)) return null;
+                // Move to end for LRU
+                const val = searchCache.get(key);
+                searchCache.delete(key);
+                searchCache.set(key, val);
+                return val;
+            }
+
+            function scsCacheStore(query, data) {
+                const key = query.toLowerCase();
+                searchCache.delete(key); // remove if exists to refresh position
+                searchCache.set(key, data);
+                if (searchCache.size > SCS_CACHE_MAX) {
+                    // Delete oldest entry (first key)
+                    const firstKey = searchCache.keys().next().value;
+                    searchCache.delete(firstKey);
+                }
+            }
+
+            // --- Per-row debounce & abort ---
+            const rowDebounceTimers = {}; // rowIndex -> timeout ID
+            const rowAbortControllers = {}; // rowIndex -> AbortController
 
             // --- Loading overlay ---
 
@@ -118,6 +146,12 @@ if (div_leftContainer != null) {
                 addBtn.innerHTML = "+";
                 container.appendChild(addBtn);
                 cell.appendChild(container);
+
+                // Add slot results div below input
+                const resultsDiv = document.createElement("div");
+                resultsDiv.className = "scs-slot-results";
+                cell.appendChild(resultsDiv);
+
                 return tr;
             }
 
@@ -144,188 +178,177 @@ if (div_leftContainer != null) {
                 addBtn.style.cursor = rows.length >= SCS_MAX_ROWS ? "default" : "pointer";
             }
 
-            // --- Phase 1 validation ---
+            // --- Validation ---
 
-            function scsGetFilledRows() {
+            function scsGetRowsWithResults() {
+                // Returns row indices that have at least one checked section
                 const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
                 const filled = [];
                 rows.forEach((row, i) => {
-                    const inputs = row.querySelectorAll(".scs-multi-input input[type='text']");
-                    const queries = Array.from(inputs)
-                        .map(inp => inp.value.trim())
-                        .filter(q => q.length >= 3);
-                    if (queries.length > 0) {
-                        filled.push({ index: i, queries });
+                    const checked = row.querySelectorAll('.scs-slot-results input[type="checkbox"]:checked');
+                    if (checked.length > 0) {
+                        filled.push(i);
                     }
                 });
                 return filled;
             }
 
             function scsValidatePhase1() {
-                const fwdBtn = document.getElementById("scs-fwd-btn");
+                const actionBtn = document.getElementById("scs-nav-action");
                 const tooltip = document.getElementById("scs-fwd-tooltip");
-                const filled = scsGetFilledRows();
                 if (scsCurrentPhase === 1) {
+                    const filled = scsGetRowsWithResults();
                     const valid = filled.length >= 2;
-                    fwdBtn.disabled = !valid;
-                    tooltip.textContent = valid ? "" : "You need to input search queries for at least 2 slots.";
+                    actionBtn.disabled = !valid;
+                    actionBtn.classList.toggle("scs-nav-ready", valid);
+                    tooltip.textContent = valid ? "" : "You need search results with selected sections for at least 2 slots.";
                 }
             }
 
-            // --- Phase transitions ---
+            // --- Render slot results ---
 
-            function scsShowPhase(n) {
-                const container = document.getElementById("scs-container");
-                container.classList.remove("scs-phase-1", "scs-phase-2", "scs-phase-3");
-                container.classList.add("scs-phase-" + n);
-                scsCurrentPhase = n;
+            function scsRenderSlotResults(rowIndex, parsedSlot) {
+                const row = document.querySelectorAll("#scs-course-rows .scs-course-row")[rowIndex];
+                if (!row) return;
+                const resultsDiv = row.querySelector(".scs-slot-results");
+                if (!resultsDiv) return;
 
-                document.querySelectorAll("#scs-dots .scs-dot").forEach(dot => {
-                    dot.classList.toggle("scs-dot-active", parseInt(dot.dataset.phase) === n);
-                });
+                const slotList = !parsedSlot ? [] : Array.isArray(parsedSlot) ? [parsedSlot] : // already single
+                    (parsedSlot.subjectCode ? [parsedSlot] : parsedSlot); // normalize
 
-                const phaseLabel = document.getElementById("scs-phase-label");
-                const phaseLabels = {
-                    1: "Course Search",
-                    2: "Refine search results & Add Custom Time Blocks",
-                    3: "View Results"
-                };
-                phaseLabel.textContent = phaseLabels[n] || "";
+                // Handle array-of-parsed (multi-subject) vs single
+                const normalizedList = !parsedSlot ? [] :
+                    Array.isArray(parsedSlot) && parsedSlot.length > 0 && parsedSlot[0].subjectCode ? parsedSlot :
+                    parsedSlot.subjectCode ? [parsedSlot] : [];
 
-                const backBtn = document.getElementById("scs-back-btn");
-                const fwdBtn = document.getElementById("scs-fwd-btn");
-                const tooltip = document.getElementById("scs-fwd-tooltip");
-
-                backBtn.disabled = n === 1;
-
-                if (n === 1) {
+                if (normalizedList.length === 0 || normalizedList.every(s => Object.keys(s.courseNums).length === 0)) {
+                    resultsDiv.innerHTML = '<span class="scs-slot-no-results">No courses found</span>';
                     scsValidatePhase1();
-                } else if (n === 2) {
-                    fwdBtn.disabled = false;
-                    tooltip.textContent = "";
-                } else {
-                    fwdBtn.disabled = true;
-                    tooltip.textContent = "";
+                    return;
                 }
+
+                const catalogBase = "https://catalog.ucdavis.edu/courses-subject-code/";
+
+                let cardsHTML = "";
+                for (const parsed of normalizedList) {
+                    const subjectCode = parsed.subjectCode;
+                    for (const courseNum of Object.keys(parsed.courseNums)) {
+                        const label = subjectCode + " " + courseNum;
+                        const seqNums = Object.keys(parsed.courseNums[courseNum]);
+                        let dropdownHTML = '<div class="scs-section-dropdown">';
+                        for (const seqNum of seqNums) {
+                            dropdownHTML += `<label class="scs-section-item"><input type="checkbox" checked data-row="${rowIndex}" data-subject-code="${subjectCode}" data-course-num="${courseNum}" data-seq-num="${seqNum}"> ${seqNum}</label>`;
+                        }
+                        dropdownHTML += '</div>';
+                        cardsHTML += `<span class="scs-course-card" data-row="${rowIndex}" data-subject-code="${subjectCode}" data-course-num="${courseNum}"><span class="scs-toggle-btn scs-toggle-on" data-course-num="${courseNum}" data-row="${rowIndex}"><a class="scs-card-info" href="${catalogBase}${subjectCode.toLowerCase()}/" target="_blank" title="Additional course info">?</a><span class="scs-card-label">${label}</span><span class="scs-card-dropdown-arrow">&#9662;</span></span>${dropdownHTML}</span>`;
+                    }
+                }
+                const summaryHTML = `<p class="scs-slot-summary" data-row="${rowIndex}"></p>`;
+                resultsDiv.innerHTML = cardsHTML + summaryHTML;
+
+                scsUpdateSlotSummary(rowIndex);
+                scsValidatePhase1();
             }
 
-            function scsEnterPhase2() {
-                scsShowLoading();
-                rowQueries = [];
-                parsedSlots = [];
+            // --- Search as you type ---
 
-                const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
+            function scsSearchRow(rowIndex) {
+                const row = document.querySelectorAll("#scs-course-rows .scs-course-row")[rowIndex];
+                if (!row) return;
 
-                // Collect all queries per row, build search tasks
-                const rowSearchTasks = []; // { rowIndex, queries[], promises[] }
+                const inputs = row.querySelectorAll(".scs-multi-input input[type='text']");
+                const queries = Array.from(inputs)
+                    .map(inp => inp.value.trim())
+                    .filter(q => q.length >= 3);
 
-                rows.forEach((row, i) => {
-                    const inputs = row.querySelectorAll(".scs-multi-input input[type='text']");
-                    const queries = Array.from(inputs).map(inp => inp.value.trim());
-                    rowQueries.push(queries);
+                const resultsDiv = row.querySelector(".scs-slot-results");
 
-                    const filledQueries = queries.filter(q => q.length >= 3);
-                    if (filledQueries.length > 0) {
-                        rowSearchTasks.push({
-                            rowIndex: i,
-                            promises: filledQueries.map(q => search(q, "", userPidm, termCode))
+                if (queries.length === 0) {
+                    // Clear results
+                    resultsDiv.innerHTML = "";
+                    parsedSlots[rowIndex] = null;
+                    scsValidatePhase1();
+                    return;
+                }
+
+                // Abort previous request for this row
+                if (rowAbortControllers[rowIndex]) {
+                    rowAbortControllers[rowIndex].abort();
+                }
+                const controller = new AbortController();
+                rowAbortControllers[rowIndex] = controller;
+
+                // Show searching indicator
+                resultsDiv.innerHTML = '<span class="scs-slot-searching">Searching...</span>';
+
+                // Check cache for each query, fetch only misses
+                const promises = queries.map(q => {
+                    const cached = scsCacheLookup(q);
+                    if (cached !== null) return Promise.resolve(cached);
+                    return search(q, "", userPidm, termCode, controller.signal)
+                        .then(data => {
+                            if (data) scsCacheStore(q, data);
+                            return data;
                         });
-                        row.style.display = "";
-                    } else {
-                        row.style.display = "none";
-                    }
                 });
 
-                // Flatten all promises, track mapping
-                const allPromises = [];
-                const promiseMap = []; // { rowIndex, queryIndex }
-                rowSearchTasks.forEach(task => {
-                    task.promises.forEach((p, qi) => {
-                        promiseMap.push({ rowIndex: task.rowIndex, queryIndex: qi });
-                        allPromises.push(p);
-                    });
-                });
+                Promise.all(promises).then(results => {
+                    // Check if this request was aborted (a newer one replaced it)
+                    if (controller.signal.aborted) return;
 
-                Promise.all(allPromises).then(results => {
-                    // Group parsed results by row
-                    const rowResults = {}; // rowIndex -> array of parseCourseSlot results
-                    results.forEach((data, ri) => {
-                        const { rowIndex } = promiseMap[ri];
-                        if (!rowResults[rowIndex]) rowResults[rowIndex] = [];
-                        if (data && data.length > 0) {
-                            rowResults[rowIndex].push(parseCourseSlot(data));
-                        }
-                    });
+                    // Parse and merge results (same logic as old scsEnterPhase2)
+                    const parsedList = results
+                        .filter(data => data && data.length > 0)
+                        .map(data => parseCourseSlot(data))
+                        .filter(p => p !== null);
 
-                    // Package parsed data: merge same-subject, array for multi-subject
-                    for (const [rowIndexStr, parsedList] of Object.entries(rowResults)) {
-                        const i = parseInt(rowIndexStr);
-                        const validParsed = parsedList.filter(p => p !== null);
-                        if (validParsed.length === 0) {
-                            parsedSlots[i] = null;
-                            continue;
-                        }
-
-                        const subjectCodes = new Set(validParsed.map(p => p.subjectCode));
-                        if (subjectCodes.size === 1) {
-                            // Merge courseNums into a single object
-                            const merged = { subjectCode: validParsed[0].subjectCode, courseNums: {} };
-                            validParsed.forEach(p => {
-                                for (const [cn, seqs] of Object.entries(p.courseNums)) {
-                                    if (!merged.courseNums[cn]) merged.courseNums[cn] = {};
-                                    Object.assign(merged.courseNums[cn], seqs);
-                                }
-                            });
-                            parsedSlots[i] = merged;
-                        } else {
-                            // Different subject codes — store as array
-                            parsedSlots[i] = validParsed;
-                        }
+                    if (parsedList.length === 0) {
+                        parsedSlots[rowIndex] = null;
+                        scsRenderSlotResults(rowIndex, null);
+                        return;
                     }
 
-                    // Build phase 2 UI
-                    let visibleNum = 1;
-                    rows.forEach((row, i) => {
-                        if (row.style.display === "none") return;
-                        row.querySelector(".scs-row-num").textContent = visibleNum++;
-
-                        const cell = row.querySelector(".scs-course-cell");
-                        const slot = parsedSlots[i];
-
-                        // Normalize to array for uniform rendering
-                        const slotList = !slot ? [] : Array.isArray(slot) ? slot : [slot];
-
-                        if (slotList.length === 0 || slotList.every(s => Object.keys(s.courseNums).length === 0)) {
-                            cell.innerHTML = '<span class="scs-slot-no-results">No courses found</span>';
-                            return;
-                        }
-
-                        const catalogBase = "https://catalog.ucdavis.edu/courses-subject-code/";
-
-                        let cardsHTML = "";
-                        for (const parsed of slotList) {
-                            const subjectCode = parsed.subjectCode;
-                            for (const courseNum of Object.keys(parsed.courseNums)) {
-                                const label = subjectCode + " " + courseNum;
-                                const seqNums = Object.keys(parsed.courseNums[courseNum]);
-                                let dropdownHTML = '<div class="scs-section-dropdown">';
-                                for (const seqNum of seqNums) {
-                                    dropdownHTML += `<label class="scs-section-item"><input type="checkbox" checked data-row="${i}" data-subject-code="${subjectCode}" data-course-num="${courseNum}" data-seq-num="${seqNum}"> ${seqNum}</label>`;
-                                }
-                                dropdownHTML += '</div>';
-                                cardsHTML += `<span class="scs-course-card" data-row="${i}" data-subject-code="${subjectCode}" data-course-num="${courseNum}"><span class="scs-toggle-btn scs-toggle-on" data-course-num="${courseNum}" data-row="${i}"><a class="scs-card-info" href="${catalogBase}${subjectCode.toLowerCase()}/" target="_blank" title="Additional course info">?</a><span class="scs-card-label">${label}</span><span class="scs-card-dropdown-arrow">&#9662;</span></span>${dropdownHTML}</span>`;
+                    const subjectCodes = new Set(parsedList.map(p => p.subjectCode));
+                    if (subjectCodes.size === 1) {
+                        // Merge courseNums into a single object
+                        const merged = { subjectCode: parsedList[0].subjectCode, courseNums: {} };
+                        parsedList.forEach(p => {
+                            for (const [cn, seqs] of Object.entries(p.courseNums)) {
+                                if (!merged.courseNums[cn]) merged.courseNums[cn] = {};
+                                Object.assign(merged.courseNums[cn], seqs);
                             }
-                        }
-                        const summaryHTML = `<p class="scs-slot-summary" data-row="${i}"></p>`;
-                        cell.innerHTML = cardsHTML + summaryHTML;
+                        });
+                        parsedSlots[rowIndex] = merged;
+                    } else {
+                        // Different subject codes — store as array
+                        parsedSlots[rowIndex] = parsedList;
+                    }
 
-                        scsUpdateSlotSummary(i);
-                    });
-
-                    scsShowPhase(2);
-                    scsHideLoading();
+                    scsRenderSlotResults(rowIndex, parsedSlots[rowIndex]);
+                }).catch(err => {
+                    if (err.name === "AbortError") return;
+                    console.error("Search error for row", rowIndex, err);
+                    resultsDiv.innerHTML = '<span class="scs-slot-no-results">Search failed</span>';
                 });
             }
+
+            function scsDebounceSearchRow(rowIndex) {
+                if (rowDebounceTimers[rowIndex]) {
+                    clearTimeout(rowDebounceTimers[rowIndex]);
+                }
+                rowDebounceTimers[rowIndex] = setTimeout(() => {
+                    scsSearchRow(rowIndex);
+                }, 400);
+            }
+
+            function scsGetRowIndex(element) {
+                const row = element.closest(".scs-course-row");
+                if (!row) return -1;
+                const rows = Array.from(document.querySelectorAll("#scs-course-rows .scs-course-row"));
+                return rows.indexOf(row);
+            }
+
+            // --- Phase 2 slot summary & card toggle (unchanged) ---
 
             function scsUpdateSlotSummary(rowIndex) {
                 const summary = document.querySelector(`.scs-slot-summary[data-row="${rowIndex}"]`);
@@ -371,7 +394,42 @@ if (div_leftContainer != null) {
                 }
             }
 
-            function scsEnterPhase3() {
+            // --- Phase transitions (now 2 phases) ---
+
+            function scsShowPhase(n) {
+                const container = document.getElementById("scs-container");
+                container.classList.remove("scs-phase-1", "scs-phase-2");
+                container.classList.add("scs-phase-" + n);
+                scsCurrentPhase = n;
+
+                document.querySelectorAll("#scs-dots .scs-dot").forEach(dot => {
+                    dot.classList.toggle("scs-dot-active", parseInt(dot.dataset.phase) === n);
+                });
+
+                const phaseLabel = document.getElementById("scs-phase-label");
+                const phaseLabels = {
+                    1: "Course Search & Timeblocks",
+                    2: "View Results"
+                };
+                phaseLabel.textContent = phaseLabels[n] || "";
+
+                const actionBtn = document.getElementById("scs-nav-action");
+                const tooltip = document.getElementById("scs-fwd-tooltip");
+
+                if (n === 1) {
+                    actionBtn.textContent = "Find Schedules";
+                    actionBtn.appendChild(tooltip);
+                    scsValidatePhase1();
+                } else {
+                    actionBtn.innerHTML = "&#8249; Back";
+                    actionBtn.disabled = false;
+                    actionBtn.classList.remove("scs-nav-ready");
+                    tooltip.textContent = "";
+                    actionBtn.appendChild(tooltip);
+                }
+            }
+
+            function scsComputeSchedules() {
                 scsShowLoading();
                 // Use requestAnimationFrame to let the browser paint the overlay before computing
                 requestAnimationFrame(() => { setTimeout(() => {
@@ -384,7 +442,7 @@ if (div_leftContainer != null) {
                         if (!slot) return;
                         const slotList = Array.isArray(slot) ? slot : [slot];
 
-                        const checkedBoxes = document.querySelectorAll(`.scs-section-dropdown input[type="checkbox"][data-row="${i}"]:checked`);
+                        const checkedBoxes = row.querySelectorAll('.scs-slot-results input[type="checkbox"]:checked');
                         if (checkedBoxes.length === 0) return;
 
                         // Group checked sections by subjectCode
@@ -516,37 +574,9 @@ if (div_leftContainer != null) {
                         });
                     }
 
-                    scsShowPhase(3);
+                    scsShowPhase(2);
                     scsHideLoading();
                 }, 0); });
-            }
-
-            function scsBackToPhase1() {
-                // Restore multi-input structure and show all rows
-                const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
-                rows.forEach((row, i) => {
-                    row.style.display = "";
-                    const cell = row.querySelector(".scs-course-cell");
-                    const queries = rowQueries[i] || [""];
-                    cell.innerHTML = "";
-                    const container = document.createElement("div");
-                    container.className = "scs-multi-container";
-                    queries.forEach(q => {
-                        const entry = scsCreateInputEntry();
-                        entry.querySelector("input[type='text']").value = q;
-                        container.appendChild(entry);
-                    });
-                    const addBtn = document.createElement("button");
-                    addBtn.className = "scs-multi-add";
-                    addBtn.title = "Add another query to this slot";
-                    addBtn.innerHTML = "+";
-                    container.appendChild(addBtn);
-                    cell.appendChild(container);
-                    scsUpdateMultiRemoveButtons(container);
-                });
-                parsedSlots = [];
-                scsUpdateRowNumbers();
-                scsShowPhase(1);
             }
 
             // --- Timeblock UI ---
@@ -647,6 +677,7 @@ if (div_leftContainer != null) {
 
                 // Clear existing rows and create one per course
                 tbody.innerHTML = "";
+                parsedSlots = [];
                 courseNames.forEach(name => {
                     const row = scsCreateRow();
                     row.querySelector(".scs-multi-input input[type='text']").value = name;
@@ -654,12 +685,18 @@ if (div_leftContainer != null) {
                 });
                 scsUpdateRowNumbers();
                 scsUpdateRemoveButtons();
-                scsValidatePhase1();
+
+                // Trigger search for each imported row
+                const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
+                rows.forEach((_, i) => {
+                    scsSearchRow(i);
+                });
             });
 
             // Clear all rows
             document.getElementById("scs-clear-btn").addEventListener("click", () => {
                 tbody.innerHTML = "";
+                parsedSlots = [];
                 tbody.appendChild(scsCreateRow());
                 tbody.appendChild(scsCreateRow());
                 scsUpdateRowNumbers();
@@ -667,7 +704,7 @@ if (div_leftContainer != null) {
                 scsValidatePhase1();
             });
 
-            // Remove row / multi-input interactions
+            // Remove row / multi-input interactions / card interactions
             tbody.addEventListener("click", (e) => {
                 // Multi-input add button
                 const multiAdd = e.target.closest(".scs-multi-add");
@@ -688,6 +725,9 @@ if (div_leftContainer != null) {
                     if (entries.length <= 1) return;
                     multiRemove.closest(".scs-multi-input").remove();
                     scsUpdateMultiRemoveButtons(container);
+                    // Re-trigger search for this row
+                    const rowIndex = scsGetRowIndex(container);
+                    if (rowIndex >= 0) scsDebounceSearchRow(rowIndex);
                     scsValidatePhase1();
                     return;
                 }
@@ -696,14 +736,17 @@ if (div_leftContainer != null) {
                 if (removeBtn) {
                     const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
                     if (rows.length <= 2) return;
+                    const rowIndex = scsGetRowIndex(removeBtn);
                     removeBtn.closest("tr").remove();
+                    // Clean up parsedSlots — remove the entry and re-index
+                    parsedSlots.splice(rowIndex, 1);
                     scsUpdateRowNumbers();
                     scsUpdateRemoveButtons();
                     scsValidatePhase1();
                     return;
                 }
 
-                if (scsCurrentPhase !== 2) return;
+                // --- Card interactions (work in phase 1 now) ---
 
                 // ? info link — let the <a> handle navigation, don't interfere
                 if (e.target.closest(".scs-card-info")) return;
@@ -728,6 +771,7 @@ if (div_leftContainer != null) {
                     checkboxes.forEach(cb => { cb.checked = !anyChecked; });
                     scsUpdateCardToggle(card);
                     scsUpdateSlotSummary(parseInt(card.dataset.row));
+                    scsValidatePhase1();
                     return;
                 }
 
@@ -737,28 +781,26 @@ if (div_leftContainer != null) {
                     const card = sectionCheckbox.closest(".scs-course-card");
                     scsUpdateCardToggle(card);
                     scsUpdateSlotSummary(parseInt(sectionCheckbox.dataset.row));
+                    scsValidatePhase1();
                 }
             });
 
-            // Validate on text input
-            tbody.addEventListener("input", () => {
-                if (scsCurrentPhase === 1) scsValidatePhase1();
-            });
-
-            // Navigation
-            document.getElementById("scs-back-btn").addEventListener("click", () => {
-                if (scsCurrentPhase === 2) {
-                    scsBackToPhase1();
-                } else if (scsCurrentPhase === 3) {
-                    scsShowPhase(2);
+            // Search-as-you-type on text input
+            tbody.addEventListener("input", (e) => {
+                if (scsCurrentPhase !== 1) return;
+                const input = e.target.closest(".scs-multi-input input[type='text']");
+                if (input) {
+                    const rowIndex = scsGetRowIndex(input);
+                    if (rowIndex >= 0) scsDebounceSearchRow(rowIndex);
                 }
             });
 
-            document.getElementById("scs-fwd-btn").addEventListener("click", () => {
+            // Navigation — single action button
+            document.getElementById("scs-nav-action").addEventListener("click", () => {
                 if (scsCurrentPhase === 1) {
-                    scsEnterPhase2();
+                    scsComputeSchedules();
                 } else if (scsCurrentPhase === 2) {
-                    scsEnterPhase3();
+                    scsShowPhase(1);
                 }
             });
 
@@ -831,6 +873,19 @@ if (div_leftContainer != null) {
                     e.target.value = val.toString().padStart(2, "0");
                 }
             });
+
+            // Toggle overflow shadow on scrollable sections
+            function scsUpdateOverflowShadow(el) {
+                el.classList.toggle("scs-scroll-overflow", el.scrollHeight > el.clientHeight && el.scrollTop + el.clientHeight < el.scrollHeight);
+            }
+
+            const coursesSection = document.getElementById("scs-courses-section");
+            const tbScroll = document.getElementById("scs-tb-entries-scroll");
+
+            for (const el of [coursesSection, tbScroll]) {
+                el.addEventListener("scroll", () => scsUpdateOverflowShadow(el));
+                new MutationObserver(() => scsUpdateOverflowShadow(el)).observe(el, { childList: true, subtree: true });
+            }
 
             scsShowPhase(1);
 

@@ -3,19 +3,19 @@
     .scs-help-tooltip { display: none; position: absolute; left: 50%; top: 16px; transform: translateX(-50%); width: 200px; background: #333; color: #fff; font-size: 11px; font-weight: normal; padding: 6px 8px; border-radius: 4px; z-index: 9999; line-height: 1.4; white-space: normal; }
     .scs-help-icon:hover .scs-help-tooltip { display: block; }
     .scs-phase-1 .scs-checkbox-col { display: none; }
-    .scs-phase-2 .scs-checkbox-col { display: none; }
-    .scs-phase-2 .scs-delete-col { display: none; }
-    .scs-phase-3 #scs-course-table { display: none; }
-    .scs-phase-2 #scs-add-btn, .scs-phase-3 #scs-add-btn { display: none; }
-    .scs-phase-2 #scs-import-btn, .scs-phase-3 #scs-import-btn { display: none; }
-    .scs-phase-2 #scs-phase1-hint, .scs-phase-3 #scs-phase1-hint { display: none; }
-    .scs-phase-2 #scs-clear-btn, .scs-phase-3 #scs-clear-btn { display: none; }
+    .scs-phase-2 #scs-courses-section { display: none; }
+    .scs-phase-2 #scs-timeblocks { display: none; }
     #scs-computed-placeholder { display: none; color: #888; font-style: italic; padding: 10px 0; text-align: center; }
-    .scs-phase-3 #scs-computed-placeholder { display: block; }
+    .scs-phase-2 #scs-computed-placeholder { display: block; }
+    #scs-courses-section { overflow-y: auto; max-height: 350px; border: 1px solid #CCD4E0; border-radius: 4px; padding: 6px; background: #f7f9fc; }
+    #scs-courses-section.scs-scroll-overflow { box-shadow: inset 0 -12px 10px -10px rgba(0,0,0,0.1); }
+    #scs-tb-entries-scroll { overflow-y: auto; max-height: 200px; border: 1px solid #CCD4E0; border-radius: 4px; padding: 6px; background: #f7f9fc; }
+    #scs-tb-entries-scroll.scs-scroll-overflow { box-shadow: inset 0 -12px 10px -10px rgba(0,0,0,0.1); }
     #scs-nav { display: flex; flex-direction: column; align-items: center; margin-top: 8px; gap: 5px; }
     #scs-nav-btns { display: flex; gap: 6px; }
-    .scs-nav-btn { position: relative; padding: 2px 10px; cursor: pointer; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 13px; }
+    .scs-nav-btn { position: relative; padding: 2px 10px; cursor: pointer; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; font-size: 13px; transition: background 0.2s, border-color 0.2s, color 0.2s; }
     .scs-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .scs-nav-btn.scs-nav-ready { background: #4a9e5c; border-color: #3d8a4e; color: #fff; }
     .scs-nav-tooltip { display: none; position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: 200px; background: #333; color: #fff; font-size: 11px; padding: 6px 8px; border-radius: 4px; z-index: 9999; line-height: 1.4; white-space: normal; text-align: center; }
     .scs-nav-btn:disabled:hover .scs-nav-tooltip { display: block; }
     .scs-course-card { position: relative; display: inline-flex; margin: 2px; vertical-align: top; border-radius: 12px; overflow: visible; }
@@ -35,6 +35,8 @@
     .scs-section-item input[type="checkbox"] { margin: 0; }
     .scs-slot-summary { font-size: 11px; color: #666; margin-top: 4px; }
     .scs-slot-no-results { font-size: 11px; color: #c44; font-style: italic; }
+    .scs-slot-results { margin-top: 4px; min-height: 0; }
+    .scs-slot-searching { font-size: 11px; color: #888; font-style: italic; }
     .scs-multi-container { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
     .scs-multi-input { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 80px; }
     .scs-multi-input input[type="text"] { flex: 1; display: block; box-sizing: border-box; padding: 3px 5px; margin: 0; border: 1px solid #CCD4E0; border-radius: 3px; min-width: 0; }
@@ -45,11 +47,9 @@
     #scs-results-table th, #scs-results-table td { padding: 4px 8px; border: 1px solid #CCD4E0; text-align: center; }
     #scs-results-table th { background: #e2e7ef; font-weight: bold; position: sticky; top: 0; }
     #scs-results-table td { background: #fff; }
-    #scs-timeblocks { display: none; margin-top: 10px; }
-    .scs-phase-2 #scs-timeblocks { display: block; }
+    #scs-timeblocks { margin-top: 10px; }
     #scs-tb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #CCD4E0; }
     #scs-tb-header span { font-weight: bold; font-size: 13px; }
-    #scs-tb-add { cursor: pointer; background: #5a7fa8; color: #fff; border: none; border-radius: 3px; padding: 2px 8px; font-size: 13px; }
     .scs-tb-entry { background: #fff; border: 1px solid #CCD4E0; border-radius: 4px; padding: 8px; margin-bottom: 6px; }
     .scs-tb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
     .scs-tb-row:last-child { margin-bottom: 0; }
@@ -92,48 +92,50 @@
         <span>Automatic Schedule Builder & Course Conflict Solver</span>
     </div>
     <div id="scs-course-section">
-        <button id="scs-import-btn" style="width: 100%; padding: 4px 0; margin-bottom: 6px; cursor: pointer; font-size: 12px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; color: #5a7fa8;">Import Current Schedule</button>
-        <button id="scs-clear-btn" style="width: 100%; padding: 4px 0; margin-bottom: 6px; cursor: pointer; font-size: 12px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; color: #c44;">Clear</button>
-        <div id="scs-phase1-hint" style="font-size: 11px; color: #666; background: #f7f9fc; border: 1px solid #d8dfe8; border-radius: 3px; padding: 6px 8px; margin-bottom: 6px; line-height: 1.4;">
-            <strong>Tip:</strong> If you don't specify a section number, all sections for that course will be considered for that slot. If you don't specify a course number, all courses for that subject code will be considered.
+        <div id="scs-courses-section">
+            <button id="scs-import-btn" style="width: 100%; padding: 4px 0; margin-bottom: 6px; cursor: pointer; font-size: 12px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; color: #5a7fa8;">Import Current Schedule</button>
+            <button id="scs-clear-btn" style="width: 100%; padding: 4px 0; margin-bottom: 6px; cursor: pointer; font-size: 12px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; color: #c44;">Clear</button>
+            <div id="scs-phase1-hint" style="font-size: 11px; color: #666; background: #f7f9fc; border: 1px solid #d8dfe8; border-radius: 3px; padding: 6px 8px; margin-bottom: 6px; line-height: 1.4;">
+                <strong>Tip:</strong> If you don't specify a section number, all sections for that course will be considered for that slot. If you don't specify a course number, all courses for that subject code will be considered.
+            </div>
+            <table id="scs-course-table" style="border-collapse: collapse; width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="padding: 2px 6px; text-align: center; font-size: 11px;">#</th>
+                        <th class="scs-delete-col"></th>
+                        <th style="padding: 2px 6px; text-align: left;">
+                            Course
+                            <div style="font-weight: normal; font-size: 10px; color: #888;">&lt;subject code&gt;<span style="color: red;">*</span> &lt;course number&gt; &lt;section number&gt; / &lt;instructor last name&gt; / &lt;keyword&gt; <span class="scs-help-icon">?<div class="scs-help-tooltip">Subject code must be specified, while course number and section number are optional. Leaving either blank may create more possible schedules.</div></span></div>
+                        </th>
+                        <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Discussion</th>
+                        <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lecture</th>
+                        <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lab</th>
+                    </tr>
+                </thead>
+                <tbody id="scs-course-rows">
+                </tbody>
+            </table>
+            <button id="scs-add-btn" style="width: 100%; padding: 4px 0; margin-top: 4px; cursor: pointer; font-size: 16px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px;">+</button>
         </div>
-        <table id="scs-course-table" style="border-collapse: collapse; width: 100%;">
-            <thead>
-                <tr>
-                    <th style="padding: 2px 6px; text-align: center; font-size: 11px;">#</th>
-                    <th class="scs-delete-col"></th>
-                    <th style="padding: 2px 6px; text-align: left;">
-                        Course
-                        <div style="font-weight: normal; font-size: 10px; color: #888;">&lt;subject code&gt;<span style="color: red;">*</span> &lt;course number&gt; &lt;section number&gt; / &lt;instructor last name&gt; / &lt;keyword&gt; <span class="scs-help-icon">?<div class="scs-help-tooltip">Subject code must be specified, while course number and section number are optional. Leaving either blank may create more possible schedules.</div></span></div>
-                    </th>
-                    <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Discussion</th>
-                    <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lecture</th>
-                    <th class="scs-checkbox-col" style="padding: 2px 6px; font-size: 11px; text-align: center;">Skip Lab</th>
-                </tr>
-            </thead>
-            <tbody id="scs-course-rows">
-            </tbody>
-        </table>
-        <button id="scs-add-btn" style="width: 100%; padding: 4px 0; margin-top: 4px; cursor: pointer; font-size: 16px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px;">+</button>
-        <div id="scs-computed-placeholder">Computed Schedules go here</div>
         <div id="scs-timeblocks">
             <div id="scs-tb-header">
                 <span>Custom Timeblocks</span>
-                <button id="scs-tb-add">+</button>
             </div>
-            <div id="scs-tb-entries"></div>
+            <div id="scs-tb-entries-scroll">
+                <div id="scs-tb-entries"></div>
+                <button id="scs-tb-add" style="width: 100%; padding: 4px 0; margin-top: 4px; cursor: pointer; font-size: 16px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px;">+</button>
+            </div>
         </div>
+        <div id="scs-computed-placeholder">Computed Schedules go here</div>
     </div>
     <div id="scs-nav">
-        <div id="scs-phase-label" style="font-weight: bold; font-size: 13px; color: #333; margin-bottom: 8px; min-height: 16px;">Course Search</div>
+        <div id="scs-phase-label" style="font-weight: bold; font-size: 13px; color: #333; margin-bottom: 8px; min-height: 16px;">Course Search & Timeblocks</div>
         <div id="scs-nav-btns">
-            <button id="scs-back-btn" class="scs-nav-btn">&#8249; Back</button>
-            <button id="scs-fwd-btn" class="scs-nav-btn">Next &#8250;<span id="scs-fwd-tooltip" class="scs-nav-tooltip"></span></button>
+            <button id="scs-nav-action" class="scs-nav-btn">Find Schedules<span id="scs-fwd-tooltip" class="scs-nav-tooltip"></span></button>
         </div>
         <div id="scs-dots">
             <span class="scs-dot" data-phase="1"></span>
             <span class="scs-dot" data-phase="2"></span>
-            <span class="scs-dot" data-phase="3"></span>
         </div>
     </div>
 </div>

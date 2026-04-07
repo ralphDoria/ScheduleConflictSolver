@@ -1,6 +1,6 @@
 // Base our search function off of host site's AJAX call
 
-function search(searchTerm, additionalFilters, pidmNum, termCode) {
+function search(searchTerm, additionalFilters, pidmNum, termCode, signal) {
     return fetch('./cf/search/search.cfc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -12,7 +12,8 @@ function search(searchTerm, additionalFilters, pidmNum, termCode) {
                 'addFilters': additionalFilters
             }),
             pidm: pidmNum
-        })
+        }),
+        signal: signal
     })
         .then(r => {
             if (!r.ok) throw r;
