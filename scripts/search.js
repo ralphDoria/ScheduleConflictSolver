@@ -27,8 +27,6 @@ function search(searchTerm, additionalFilters, pidmNum, termCode) {
         .catch(err => {
 
             // remove the spinner on the search button
-            search.spinOff(button);
-
             if (
                 err.statusText == 'Course Data is missing.  Loading in data from the database.' ||
                 err.statusText == 'Course Data was missing.  Loading in data from the database.'

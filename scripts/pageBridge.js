@@ -1,12 +1,11 @@
 const PAGE_MESSAGES = {
     GET_SCHEDULE_DATA: "GET_SCHEDULE_DATA",
+    SYNC_CREATE_SCHEDULE: "SYNC_CREATE_SCHEDULE",
+    SYNC_ADD_COURSE: "SYNC_ADD_COURSE",
+    SYNC_REMOVE_SCHEDULE: "SYNC_REMOVE_SCHEDULE",
 };
 
-const PAGE_RESPONSES = {
-    GET_SCHEDULE_DATA: "GET_SCHEDULE_DATA_RESPONSE",
-};
-
-function requestFromPage(type) {
+function requestFromPage(type, params) {
     return new Promise((resolve) => {
         const responseType = type + "_RESPONSE";
         function handler(event) {
@@ -15,6 +14,6 @@ function requestFromPage(type) {
             resolve(event.data.data);
         }
         window.addEventListener("message", handler);
-        window.postMessage({ type });
+        window.postMessage({ type, params });
     });
 }

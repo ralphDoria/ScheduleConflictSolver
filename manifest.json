@@ -23,6 +23,7 @@
         "scripts/parseCustomTimeBlocks.js",
         "scripts/createAllPossibleSchedules.js",
         "scripts/pageBridge.js",
+        "scripts/scheduleAPI.js",
         "scripts/content.js"
       ]
     }

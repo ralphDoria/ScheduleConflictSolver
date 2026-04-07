@@ -31,6 +31,24 @@ async function getCurrentScheduleCourseNames(thisScheduleName, schedules) {
         .map(data => data[0].course.shortDesc);
 }
 
+// Temporary test function — call from console: testScheduleBridge()
+async function testScheduleBridge() {
+    const name = "ScheduleBob Test 2";
+    const crns = ["48590", "48591"]; // replace with real CRNs
+
+    const createRes = await createScheduleAndSync(termCode, name);
+    console.log("Create:", createRes);
+
+    for (const crn of crns) {
+        const addRes = await addCourseAndSync(termCode, name, crn);
+        console.log("Add course:", crn, addRes);
+    }
+
+    // const removeRes = await removeScheduleAndSync(termCode, name);
+    // console.log("Remove:", removeRes);
+}
+// testScheduleBridge();
+
 // Getting left container and injecting our own html within it
 let div_leftContainer = document.getElementById("LeftContainer");
 if (div_leftContainer == null) {
@@ -431,8 +449,71 @@ if (div_leftContainer != null) {
                             });
                             tableHTML += '</tr>';
                         }
+                        tableHTML += '<tr><td style="font-weight: bold;"></td>';
+                        schedules.forEach((_, i) => {
+                            tableHTML += `<td><button class="scs-schedule-toggle" data-schedule="${i}">Add</button></td>`;
+                        });
+                        tableHTML += '</tr>';
                         tableHTML += '</tbody></table></div>';
                         placeholder.innerHTML = tableHTML;
+
+                        // Toggle add/remove on schedule columns
+                        placeholder.addEventListener("click", async (e) => {
+                            const btn = e.target.closest(".scs-schedule-toggle");
+                            if (!btn || btn.disabled) return;
+
+                            const schedIdx = parseInt(btn.dataset.schedule);
+                            const schedule = schedules[schedIdx];
+                            const isAdded = btn.classList.contains("scs-toggle-added");
+
+                            btn.disabled = true;
+                            btn.textContent = isAdded ? "Removing..." : "Adding...";
+
+                            try {
+                                if (!isAdded) {
+                                    // Create a new schedule and add all courses
+                                    const scheduleName = "ScheduleBob " + (schedIdx + 1);
+                                    console.log("[SCS] Creating schedule:", scheduleName);
+                                    const createRes = await createScheduleAndSync(termCode, scheduleName);
+                                    console.log("[SCS] Create result:", createRes);
+                                    if (!createRes.Success) throw new Error("Failed to create schedule");
+
+                                    btn.dataset.scheduleName = scheduleName;
+
+                                    for (const entry of schedule) {
+                                        // Search to find CRN and full course data for this section
+                                        console.log("[SCS] Searching for:", entry.subjectCode, entry.courseNum, entry.seqNum);
+                                        const searchData = await search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode);
+                                        console.log("[SCS] Search returned:", searchData ? searchData.length + " results" : "null");
+                                        if (!searchData) continue;
+                                        const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
+                                        if (!match) { console.warn("[SCS] No match for seqNum:", entry.seqNum); continue; }
+
+                                        console.log("[SCS] Adding course CRN:", match.course.crn);
+                                        await addCourseAndSync(termCode, scheduleName, match.course.crn, match);
+                                        console.log("[SCS] Course added successfully");
+                                    }
+
+                                    btn.classList.add("scs-toggle-added");
+                                    btn.textContent = "Remove";
+                                } else {
+                                    // Remove the schedule we created
+                                    const scheduleName = btn.dataset.scheduleName;
+                                    if (scheduleName) {
+                                        await removeScheduleAndSync(termCode, scheduleName);
+                                    }
+
+                                    btn.classList.remove("scs-toggle-added");
+                                    btn.textContent = "Add";
+                                    delete btn.dataset.scheduleName;
+                                }
+                            } catch (err) {
+                                console.error("Schedule toggle failed:", err);
+                                btn.textContent = isAdded ? "Remove" : "Add";
+                            }
+
+                            btn.disabled = false;
+                        });
                     }
 
                     scsShowPhase(3);
