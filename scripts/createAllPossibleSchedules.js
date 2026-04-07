@@ -62,7 +62,8 @@ function createAllPossibleSchedules(courseSlots, timeblocks) {
             results.push(selected.map(s => ({
                 subjectCode: s.subjectCode,
                 courseNum: s.courseNum,
-                seqNum: s.seqNum
+                seqNum: s.seqNum,
+                meetings: s.meetings
             })));
             return;
         }
@@ -104,6 +105,36 @@ function createAllPossibleSchedules(courseSlots, timeblocks) {
     return results;
 }
 
+const SCS_MAX_COMBINATIONS = 500;
+
+function createAllCombinations(courseSlots) {
+    const slotOptions = courseSlots.map(flattenSlot);
+    const results = [];
+
+    function backtrack(slotIndex, selected) {
+        if (results.length >= SCS_MAX_COMBINATIONS) return;
+        if (slotIndex === slotOptions.length) {
+            results.push(selected.map(s => ({
+                subjectCode: s.subjectCode,
+                courseNum: s.courseNum,
+                seqNum: s.seqNum,
+                meetings: s.meetings
+            })));
+            return;
+        }
+
+        for (const option of slotOptions[slotIndex]) {
+            if (results.length >= SCS_MAX_COMBINATIONS) return;
+            selected.push(option);
+            backtrack(slotIndex + 1, selected);
+            selected.pop();
+        }
+    }
+
+    backtrack(0, []);
+    return results;
+}
+
 if (typeof module !== "undefined") {
-    module.exports = { flattenSlot, flattenSingleSlot, meetingPairConflicts, meetingsConflict, conflictsWithTimeblocks, createAllPossibleSchedules };
+    module.exports = { flattenSlot, flattenSingleSlot, meetingPairConflicts, meetingsConflict, conflictsWithTimeblocks, createAllPossibleSchedules, createAllCombinations };
 }

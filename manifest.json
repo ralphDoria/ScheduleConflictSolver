@@ -24,6 +24,7 @@
         "scripts/createAllPossibleSchedules.js",
         "scripts/pageBridge.js",
         "scripts/scheduleAPI.js",
+        "scripts/weekCalendar.js",
         "scripts/content.js"
       ]
     }

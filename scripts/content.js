@@ -429,9 +429,85 @@ if (div_leftContainer != null) {
                 }
             }
 
+            // --- Phase 2 state ---
+            let allValidSchedules = [];
+            let allConflictSchedules = [];
+            let calendarTimeblocks = []; // named timeblocks for calendar display
+            let selectedScheduleKey = null; // { type: "valid"|"conflict", idx: number }
+            let calendarInitialized = false;
+
+            function scsSerializeSchedule(schedule) {
+                return schedule.map(e => e.subjectCode + "|" + e.courseNum + "|" + e.seqNum).join(";");
+            }
+
+            function scsGetScheduleByKey(key) {
+                if (!key) return null;
+                const list = key.type === "valid" ? allValidSchedules : allConflictSchedules;
+                return list[key.idx] || null;
+            }
+
+            function scsBuildScheduleTable(schedules, type, includeAddBtn) {
+                if (schedules.length === 0) return "";
+                const numSlots = schedules[0].length;
+                let html = '<div class="scs-results-scroll"><table class="scs-results-table" data-type="' + type + '"><thead><tr><th>Slot</th>';
+                schedules.forEach((_, i) => {
+                    html += `<th data-col="${i}" data-type="${type}">Schedule ${i + 1}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                for (let s = 0; s < numSlots; s++) {
+                    html += `<tr><td style="font-weight: bold;">${s + 1}</td>`;
+                    schedules.forEach((schedule, i) => {
+                        const entry = schedule[s];
+                        html += `<td data-col="${i}" data-type="${type}" data-subject-code="${entry.subjectCode}" data-course-num="${entry.courseNum}" data-seq-num="${entry.seqNum}">${entry.subjectCode} ${entry.courseNum} ${entry.seqNum}</td>`;
+                    });
+                    html += '</tr>';
+                }
+                if (includeAddBtn) {
+                    html += '<tr><td style="font-weight: bold;"></td>';
+                    schedules.forEach((_, i) => {
+                        html += `<td data-col="${i}" data-type="${type}"><button class="scs-schedule-toggle" data-schedule="${i}">Add</button></td>`;
+                    });
+                    html += '</tr>';
+                }
+                html += '</tbody></table></div>';
+                return html;
+            }
+
+            function scsSelectScheduleColumn(type, idx) {
+                // Remove old selection
+                document.querySelectorAll(".scs-results-table .scs-col-selected").forEach(el => el.classList.remove("scs-col-selected"));
+                selectedScheduleKey = { type, idx };
+                // Highlight new column
+                document.querySelectorAll(`.scs-results-table[data-type="${type}"] [data-col="${idx}"][data-type="${type}"]`).forEach(el => {
+                    el.classList.add("scs-col-selected");
+                });
+                // Render calendar
+                const schedule = scsGetScheduleByKey(selectedScheduleKey);
+                if (schedule) scsWeekCalendar.renderSchedule(schedule, calendarTimeblocks);
+            }
+
+            function scsHoverScheduleColumn(type, idx) {
+                // Add hover class
+                document.querySelectorAll(`.scs-results-table[data-type="${type}"] [data-col="${idx}"][data-type="${type}"]`).forEach(el => {
+                    el.classList.add("scs-col-hover");
+                });
+                // Temporarily render this schedule
+                const list = type === "valid" ? allValidSchedules : allConflictSchedules;
+                const schedule = list[idx];
+                if (schedule) scsWeekCalendar.renderSchedule(schedule, calendarTimeblocks);
+            }
+
+            function scsUnhoverScheduleColumn(type, idx) {
+                document.querySelectorAll(`.scs-results-table[data-type="${type}"] [data-col="${idx}"][data-type="${type}"]`).forEach(el => {
+                    el.classList.remove("scs-col-hover");
+                });
+                // Restore selected schedule
+                const schedule = scsGetScheduleByKey(selectedScheduleKey);
+                if (schedule) scsWeekCalendar.renderSchedule(schedule, calendarTimeblocks);
+            }
+
             function scsComputeSchedules() {
                 scsShowLoading();
-                // Use requestAnimationFrame to let the browser paint the overlay before computing
                 requestAnimationFrame(() => { setTimeout(() => {
                     // Refine parsed data based on section-level toggle state
                     const refinedSlots = [];
@@ -445,7 +521,6 @@ if (div_leftContainer != null) {
                         const checkedBoxes = row.querySelectorAll('.scs-slot-results input[type="checkbox"]:checked');
                         if (checkedBoxes.length === 0) return;
 
-                        // Group checked sections by subjectCode
                         const bySubject = {};
                         checkedBoxes.forEach(cb => {
                             const sc = cb.dataset.subjectCode;
@@ -456,7 +531,6 @@ if (div_leftContainer != null) {
                             bySubject[sc][courseNum].push(seqNum);
                         });
 
-                        // Build refined slot(s) by looking up section data from parsed slot
                         const refinedForRow = [];
                         for (const [sc, courseNums] of Object.entries(bySubject)) {
                             const source = slotList.find(s => s.subjectCode === sc);
@@ -483,45 +557,69 @@ if (div_leftContainer != null) {
                         }
                     });
 
-                    // Compute schedules
+                    // Compute valid and all schedules
                     const timeblocks = parseCustomTimeBlocks();
-                    const schedules = createAllPossibleSchedules(refinedSlots, timeblocks);
+                    // Build named timeblocks for calendar display
+                    const tbDomEntries = document.querySelectorAll("#scs-tb-entries .scs-tb-entry");
+                    const namedTimeblocks = timeblocks.map((tb, i) => ({
+                        ...tb,
+                        name: tbDomEntries[i]?.querySelector(".scs-tb-name")?.value.trim() || "Blocked"
+                    }));
+
+                    calendarTimeblocks = namedTimeblocks;
+                    allValidSchedules = createAllPossibleSchedules(refinedSlots, timeblocks);
+                    const allCombinations = createAllCombinations(refinedSlots);
+
+                    // Derive conflicting = all minus valid
+                    const validKeys = new Set(allValidSchedules.map(scsSerializeSchedule));
+                    allConflictSchedules = allCombinations
+                        .filter(s => !validKeys.has(scsSerializeSchedule(s)))
+                        .slice(0, 50);
+
                     const placeholder = document.getElementById("scs-computed-placeholder");
+                    let html = "";
 
-                    if (schedules.length === 0) {
-                        placeholder.innerHTML = "<p>No conflict-free schedules found.</p>";
+                    // Valid schedules table
+                    if (allValidSchedules.length > 0) {
+                        html += `<p style="font-weight: bold; font-style: normal; color: #333; margin-bottom: 6px;">${allValidSchedules.length} conflict-free schedule(s) found:</p>`;
+                        html += scsBuildScheduleTable(allValidSchedules, "valid", true);
                     } else {
-                        // Build table: rows = slot numbers, columns = schedules
-                        const numSlots = schedules[0].length;
-                        let tableHTML = `<p style="font-weight: bold; font-style: normal; color: #333; margin-bottom: 6px;">${schedules.length} schedule(s) found:</p>`;
-                        tableHTML += '<div class="scs-results-scroll"><table id="scs-results-table"><thead><tr><th>Slot</th>';
-                        schedules.forEach((_, i) => {
-                            tableHTML += `<th>Schedule ${i + 1}</th>`;
-                        });
-                        tableHTML += '</tr></thead><tbody>';
-                        for (let s = 0; s < numSlots; s++) {
-                            tableHTML += `<tr><td style="font-weight: bold;">${s + 1}</td>`;
-                            schedules.forEach(schedule => {
-                                const entry = schedule[s];
-                                tableHTML += `<td>${entry.subjectCode} ${entry.courseNum} ${entry.seqNum}</td>`;
-                            });
-                            tableHTML += '</tr>';
-                        }
-                        tableHTML += '<tr><td style="font-weight: bold;"></td>';
-                        schedules.forEach((_, i) => {
-                            tableHTML += `<td><button class="scs-schedule-toggle" data-schedule="${i}">Add</button></td>`;
-                        });
-                        tableHTML += '</tr>';
-                        tableHTML += '</tbody></table></div>';
-                        placeholder.innerHTML = tableHTML;
+                        html += `<p style="font-style: normal; color: #333; margin-bottom: 6px;">No conflict-free schedules found.</p>`;
+                    }
 
-                        // Toggle add/remove on schedule columns
-                        placeholder.addEventListener("click", async (e) => {
-                            const btn = e.target.closest(".scs-schedule-toggle");
-                            if (!btn || btn.disabled) return;
+                    // Conflicting schedules table
+                    if (allConflictSchedules.length > 0) {
+                        html += `<p class="scs-conflict-header">${allConflictSchedules.length} conflicting schedule(s):</p>`;
+                        html += scsBuildScheduleTable(allConflictSchedules, "conflict", false);
+                    }
 
+                    // Calendar container
+                    html += '<div id="scs-calendar-container"></div>';
+
+                    placeholder.innerHTML = html;
+
+                    // Initialize calendar
+                    const calContainer = document.getElementById("scs-calendar-container");
+                    calendarInitialized = false;
+                    scsWeekCalendar.init(calContainer);
+                    calendarInitialized = true;
+
+                    // Auto-select first schedule
+                    if (allValidSchedules.length > 0) {
+                        scsSelectScheduleColumn("valid", 0);
+                    } else if (allConflictSchedules.length > 0) {
+                        scsSelectScheduleColumn("conflict", 0);
+                    }
+
+                    // --- Interaction handlers on placeholder ---
+
+                    // Column click (select) & Add/Remove toggle
+                    placeholder.addEventListener("click", async (e) => {
+                        // Add/Remove button
+                        const btn = e.target.closest(".scs-schedule-toggle");
+                        if (btn && !btn.disabled) {
                             const schedIdx = parseInt(btn.dataset.schedule);
-                            const schedule = schedules[schedIdx];
+                            const schedule = allValidSchedules[schedIdx];
                             const isAdded = btn.classList.contains("scs-toggle-added");
 
                             btn.disabled = true;
@@ -529,38 +627,23 @@ if (div_leftContainer != null) {
 
                             try {
                                 if (!isAdded) {
-                                    // Create a new schedule and add all courses
                                     const scheduleName = "ScheduleBob " + (schedIdx + 1);
-                                    console.log("[SCS] Creating schedule:", scheduleName);
                                     const createRes = await createScheduleAndSync(termCode, scheduleName);
-                                    console.log("[SCS] Create result:", createRes);
                                     if (!createRes.Success) throw new Error("Failed to create schedule");
-
                                     btn.dataset.scheduleName = scheduleName;
 
                                     for (const entry of schedule) {
-                                        // Search to find CRN and full course data for this section
-                                        console.log("[SCS] Searching for:", entry.subjectCode, entry.courseNum, entry.seqNum);
                                         const searchData = await search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode);
-                                        console.log("[SCS] Search returned:", searchData ? searchData.length + " results" : "null");
                                         if (!searchData) continue;
                                         const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
-                                        if (!match) { console.warn("[SCS] No match for seqNum:", entry.seqNum); continue; }
-
-                                        console.log("[SCS] Adding course CRN:", match.course.crn);
+                                        if (!match) continue;
                                         await addCourseAndSync(termCode, scheduleName, match.course.crn, match);
-                                        console.log("[SCS] Course added successfully");
                                     }
-
                                     btn.classList.add("scs-toggle-added");
                                     btn.textContent = "Remove";
                                 } else {
-                                    // Remove the schedule we created
                                     const scheduleName = btn.dataset.scheduleName;
-                                    if (scheduleName) {
-                                        await removeScheduleAndSync(termCode, scheduleName);
-                                    }
-
+                                    if (scheduleName) await removeScheduleAndSync(termCode, scheduleName);
                                     btn.classList.remove("scs-toggle-added");
                                     btn.textContent = "Add";
                                     delete btn.dataset.scheduleName;
@@ -569,10 +652,66 @@ if (div_leftContainer != null) {
                                 console.error("Schedule toggle failed:", err);
                                 btn.textContent = isAdded ? "Remove" : "Add";
                             }
-
                             btn.disabled = false;
-                        });
-                    }
+                            return;
+                        }
+
+                        // Column click (select)
+                        const cell = e.target.closest("[data-col][data-type]");
+                        if (cell) {
+                            scsSelectScheduleColumn(cell.dataset.type, parseInt(cell.dataset.col));
+                        }
+                    });
+
+                    // Column hover (preview)
+                    let currentHover = null;
+                    placeholder.addEventListener("mouseover", (e) => {
+                        const cell = e.target.closest("[data-col][data-type]");
+                        if (!cell) return;
+                        const type = cell.dataset.type;
+                        const col = parseInt(cell.dataset.col);
+                        const key = type + ":" + col;
+                        if (currentHover === key) return;
+                        if (currentHover) {
+                            const [prevType, prevCol] = currentHover.split(":");
+                            scsUnhoverScheduleColumn(prevType, parseInt(prevCol));
+                        }
+                        currentHover = key;
+                        scsHoverScheduleColumn(type, col);
+                    });
+
+                    placeholder.addEventListener("mouseleave", () => {
+                        if (currentHover) {
+                            const [prevType, prevCol] = currentHover.split(":");
+                            scsUnhoverScheduleColumn(prevType, parseInt(prevCol));
+                            currentHover = null;
+                        }
+                    });
+
+                    // Course cell hover (highlight in calendar)
+                    let highlightedCell = null;
+                    placeholder.addEventListener("mouseover", (e) => {
+                        const cell = e.target.closest("td[data-subject-code]");
+                        if (cell === highlightedCell) return;
+                        if (highlightedCell) {
+                            highlightedCell.classList.remove("scs-cell-highlight");
+                            scsWeekCalendar.clearHighlight();
+                            highlightedCell = null;
+                        }
+                        if (cell) {
+                            highlightedCell = cell;
+                            cell.classList.add("scs-cell-highlight");
+                            scsWeekCalendar.highlightCourse(cell.dataset.subjectCode, cell.dataset.courseNum, cell.dataset.seqNum);
+                        }
+                    });
+
+                    placeholder.addEventListener("mouseleave", () => {
+                        if (highlightedCell) {
+                            highlightedCell.classList.remove("scs-cell-highlight");
+                            scsWeekCalendar.clearHighlight();
+                            highlightedCell = null;
+                        }
+                    });
 
                     scsShowPhase(2);
                     scsHideLoading();
