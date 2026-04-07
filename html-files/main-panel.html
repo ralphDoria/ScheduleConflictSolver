@@ -8,6 +8,7 @@
     .scs-phase-3 #scs-course-table { display: none; }
     .scs-phase-2 #scs-add-btn, .scs-phase-3 #scs-add-btn { display: none; }
     .scs-phase-2 #scs-import-btn, .scs-phase-3 #scs-import-btn { display: none; }
+    .scs-phase-2 #scs-phase1-hint, .scs-phase-3 #scs-phase1-hint { display: none; }
     .scs-phase-2 #scs-clear-btn, .scs-phase-3 #scs-clear-btn { display: none; }
     #scs-computed-placeholder { display: none; color: #888; font-style: italic; padding: 10px 0; text-align: center; }
     .scs-phase-3 #scs-computed-placeholder { display: block; }
@@ -76,6 +77,8 @@
     #scs-dots { display: flex; gap: 5px; }
     #scs-course-rows .scs-course-row:nth-child(even) { background-color: #e4e9f0; }
     .scs-dot { width: 7px; height: 7px; border-radius: 50%; background: #CCD4E0; }
+    .scs-schedule-toggle { padding: 3px 10px; font-size: 11px; cursor: pointer; border: 1px solid #5a7fa8; border-radius: 3px; background: #5a7fa8; color: #fff; }
+    .scs-schedule-toggle.scs-toggle-added { background: #c44; border-color: #c44; }
     .scs-dot.scs-dot-active { background: #5a7fa8; }
     #scs-loading-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 10000; align-items: center; justify-content: center; border-radius: inherit; }
     #scs-loading-overlay.scs-loading-active { display: flex; }
@@ -91,6 +94,9 @@
     <div id="scs-course-section">
         <button id="scs-import-btn" style="width: 100%; padding: 4px 0; margin-bottom: 6px; cursor: pointer; font-size: 12px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; color: #5a7fa8;">Import Current Schedule</button>
         <button id="scs-clear-btn" style="width: 100%; padding: 4px 0; margin-bottom: 6px; cursor: pointer; font-size: 12px; background: #fff; border: 1px solid #CCD4E0; border-radius: 3px; color: #c44;">Clear</button>
+        <div id="scs-phase1-hint" style="font-size: 11px; color: #666; background: #f7f9fc; border: 1px solid #d8dfe8; border-radius: 3px; padding: 6px 8px; margin-bottom: 6px; line-height: 1.4;">
+            <strong>Tip:</strong> If you don't specify a section number, all sections for that course will be considered for that slot. If you don't specify a course number, all courses for that subject code will be considered.
+        </div>
         <table id="scs-course-table" style="border-collapse: collapse; width: 100%;">
             <thead>
                 <tr>
