@@ -5,13 +5,6 @@ Description: ScheduleBob is an automatic schedule builder & course conflict solv
 ## The Gist
 Given your preferences for courses, from general (e.g. I just want any philosophy course that fits into my current schedule) to specific (e.g. I want to keep this exact course and section because my friends are in it), it'll find all possible, conflict-free schedules for you to choose from.
 
-## New Core Feature for 2.0
-1. Accounts, friends, be able to see the courses that friends are registered in
-
-## V2 polishing
-~~1. Automatic refresh on friend requests.~~
-1. Make calendar components smaller, more condensed or put them into overflow, or both
-
 ## Bugs:
 1. Schedules exported from ScheduleBob cannot be reimported (some server state/browserstate we didn't update)
 
