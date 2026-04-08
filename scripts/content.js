@@ -1032,17 +1032,6 @@ if (div_leftContainer != null) {
                 scsFriendsModal.open();
             });
 
-            // Placeholder data for scaffold
-            scsFriendsModal.setRequests([
-                { name: "Alice Johnson" },
-                { name: "Bob Williams" }
-            ]);
-            scsFriendsModal.setFriends([
-                { name: "Charlie Brown", courses: ["ECS 150", "MAT 021C", "PHY 009B"] },
-                { name: "Diana Prince", courses: ["ECS 160", "ECS 140A"] },
-                { name: "Eve Torres", courses: ["STA 032", "MAT 022A", "ECS 036C"] }
-            ]);
-
             scsShowPhase(1);
 
             console.log("ScheduleConflictSolver has successfully modified DOM.");

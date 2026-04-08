@@ -8,6 +8,17 @@
     "48": "images/ScheduleBobLogoZoomed.png",
     "128": "images/ScheduleBobLogoZoomed.png"
   },
+  "permissions": ["identity", "storage"],
+  "background": {
+    "service_worker": "scripts/background.js"
+  },
+  "oauth2": {
+    "client_id": "8666715098-ni83ap49asa89f3avqhoq6s9pk5ec2jg.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": "images/ScheduleBobLogoZoomed.png"

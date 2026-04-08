@@ -1,11 +1,22 @@
 // Self-contained Friends Modal component for ScheduleConflictSolver
-// Usage: scsFriendsModal.init(), scsFriendsModal.open(), scsFriendsModal.close()
+// Usage: scsFriendsModal.init(container), scsFriendsModal.open(), scsFriendsModal.close()
 
 const scsFriendsModal = (() => {
     let overlay = null;
+    let modalEl = null;
+    let loginView = null;
+    let contentView = null;
+    let userBar = null;
     let requestsGrid = null;
     let friendsGrid = null;
     let initialized = false;
+    let currentUser = null;
+
+    function sendToBackground(msg) {
+        return new Promise((resolve) => {
+            chrome.runtime.sendMessage(msg, resolve);
+        });
+    }
 
     function injectCSS() {
         if (document.getElementById("scs-friends-modal-styles")) return;
@@ -19,6 +30,14 @@ const scsFriendsModal = (() => {
             .scs-friends-title { font-weight: bold; font-size: 16px; }
             .scs-friends-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #888; padding: 0 4px; line-height: 1; }
             .scs-friends-close:hover { color: #333; }
+            .scs-friends-login { padding: 30px 16px; text-align: center; }
+            .scs-friends-login p { color: #555; margin-bottom: 16px; font-size: 13px; }
+            .scs-friends-google-btn { padding: 8px 20px; font-size: 13px; cursor: pointer; background: #fff; border: 1px solid #CCD4E0; border-radius: 4px; color: #333; display: inline-flex; align-items: center; gap: 8px; }
+            .scs-friends-google-btn:hover { background: #f5f5f5; }
+            .scs-friends-login-error { color: #c44; font-size: 11px; margin-top: 10px; }
+            .scs-friends-user-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: #f7f9fc; border-bottom: 1px solid #eee; font-size: 11px; color: #555; }
+            .scs-friends-logout { background: none; border: none; color: #c44; cursor: pointer; font-size: 11px; }
+            .scs-friends-logout:hover { text-decoration: underline; }
             .scs-friends-section { padding: 12px 16px; }
             .scs-friends-section-title { font-weight: bold; font-size: 13px; color: #555; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #eee; }
             .scs-friends-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -42,13 +61,26 @@ const scsFriendsModal = (() => {
         document.head.appendChild(style);
     }
 
+    function showLoginView() {
+        loginView.style.display = "";
+        contentView.style.display = "none";
+        userBar.style.display = "none";
+    }
+
+    function showContentView(user) {
+        loginView.style.display = "none";
+        contentView.style.display = "";
+        userBar.style.display = "";
+        userBar.querySelector(".scs-friends-user-email").textContent = user.email;
+    }
+
     function buildModal() {
         overlay = document.createElement("div");
         overlay.id = "scs-friends-overlay";
         overlay.className = "scs-friends-hidden";
 
-        const modal = document.createElement("div");
-        modal.id = "scs-friends-modal";
+        modalEl = document.createElement("div");
+        modalEl.id = "scs-friends-modal";
 
         // Header
         const header = document.createElement("div");
@@ -57,7 +89,31 @@ const scsFriendsModal = (() => {
             <span class="scs-friends-title">Friends</span>
             <button class="scs-friends-close">&times;</button>
         `;
-        modal.appendChild(header);
+        modalEl.appendChild(header);
+
+        // Login view (shown when not authenticated)
+        loginView = document.createElement("div");
+        loginView.className = "scs-friends-login";
+        loginView.innerHTML = `
+            <p>Sign in to connect with friends and see their courses</p>
+            <button class="scs-friends-google-btn">Sign in with Google</button>
+            <div class="scs-friends-login-error" style="display: none;"></div>
+        `;
+        modalEl.appendChild(loginView);
+
+        // User bar (shown when authenticated)
+        userBar = document.createElement("div");
+        userBar.className = "scs-friends-user-bar";
+        userBar.style.display = "none";
+        userBar.innerHTML = `
+            <span>Signed in as <strong class="scs-friends-user-email"></strong></span>
+            <button class="scs-friends-logout">Sign out</button>
+        `;
+        modalEl.appendChild(userBar);
+
+        // Content view (requests + friends, shown when authenticated)
+        contentView = document.createElement("div");
+        contentView.style.display = "none";
 
         // Requests section
         const requestsSection = document.createElement("div");
@@ -68,7 +124,7 @@ const scsFriendsModal = (() => {
         requestsGrid.className = "scs-friends-grid";
         requestsGrid.innerHTML = '<div class="scs-friends-empty">No pending requests</div>';
         requestsSection.appendChild(requestsGrid);
-        modal.appendChild(requestsSection);
+        contentView.appendChild(requestsSection);
 
         // Friends section
         const friendsSection = document.createElement("div");
@@ -79,9 +135,12 @@ const scsFriendsModal = (() => {
         friendsGrid.className = "scs-friends-grid";
         friendsGrid.innerHTML = '<div class="scs-friends-empty">No friends added yet</div>';
         friendsSection.appendChild(friendsGrid);
-        modal.appendChild(friendsSection);
+        contentView.appendChild(friendsSection);
 
-        overlay.appendChild(modal);
+        modalEl.appendChild(contentView);
+        overlay.appendChild(modalEl);
+
+        // --- Event handlers ---
 
         // Close on backdrop click
         overlay.addEventListener("click", (e) => {
@@ -102,18 +161,44 @@ const scsFriendsModal = (() => {
             }
         });
 
+        // Google sign-in
+        loginView.querySelector(".scs-friends-google-btn").addEventListener("click", async () => {
+            const btn = loginView.querySelector(".scs-friends-google-btn");
+            const errorEl = loginView.querySelector(".scs-friends-login-error");
+            btn.textContent = "Signing in...";
+            btn.disabled = true;
+            errorEl.style.display = "none";
+
+            const result = await sendToBackground({ type: "SCS_AUTH_LOGIN" });
+            if (result && result.loggedIn) {
+                currentUser = result.user;
+                showContentView(currentUser);
+            } else {
+                errorEl.textContent = result?.error || "Sign-in failed. Please try again.";
+                errorEl.style.display = "";
+            }
+            btn.textContent = "Sign in with Google";
+            btn.disabled = false;
+        });
+
+        // Sign out
+        userBar.querySelector(".scs-friends-logout").addEventListener("click", async () => {
+            await sendToBackground({ type: "SCS_AUTH_LOGOUT" });
+            currentUser = null;
+            showLoginView();
+        });
+
         // Friend card dropdown toggle
         friendsGrid.addEventListener("click", (e) => {
-            const header = e.target.closest(".scs-friend-card-header");
-            if (header) {
-                const card = header.closest(".scs-friend-card");
+            const cardHeader = e.target.closest(".scs-friend-card-header");
+            if (cardHeader) {
+                const card = cardHeader.closest(".scs-friend-card");
                 card.classList.toggle("scs-friend-expanded");
                 const courses = card.querySelector(".scs-friend-courses");
                 if (courses) courses.classList.toggle("scs-friend-courses-hidden");
                 return;
             }
 
-            // Course add button
             const addBtn = e.target.closest(".scs-friend-course-add");
             if (addBtn) {
                 const courseName = addBtn.closest(".scs-friend-course-item").querySelector("span").textContent;
@@ -135,7 +220,6 @@ const scsFriendsModal = (() => {
                 console.log("[SCS Friends] Decline request from:", name);
             }
         });
-
     }
 
     return {
@@ -147,9 +231,19 @@ const scsFriendsModal = (() => {
             initialized = true;
         },
 
-        open() {
+        async open() {
             if (!initialized) return;
             overlay.classList.remove("scs-friends-hidden");
+
+            // Check auth state
+            const result = await sendToBackground({ type: "SCS_AUTH_CHECK" });
+            if (result && result.loggedIn) {
+                currentUser = result.user;
+                showContentView(currentUser);
+            } else {
+                currentUser = null;
+                showLoginView();
+            }
         },
 
         close() {
@@ -196,6 +290,10 @@ const scsFriendsModal = (() => {
                     </div>
                 `;
             }).join("");
+        },
+
+        getUser() {
+            return currentUser;
         }
     };
 })();

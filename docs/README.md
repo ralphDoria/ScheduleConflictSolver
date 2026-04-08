@@ -5,18 +5,6 @@ Description: ScheduleBob is an automatic schedule builder & course conflict solv
 ## The Gist
 Given your preferences for courses, from general (e.g. I just want any philosophy course that fits into my current schedule) to specific (e.g. I want to keep this exact course and section because my friends are in it), it'll find all possible, conflict-free schedules for you to choose from.
 
-## Polishing: 
-1. Condense 1st & 2nd phases into one.
-    * implement search-as-you-type
-        * debounce & cache results for efficiency
-    * Add custom time blocks to first phase as well
-    * add filtering to first phase (e.g. no early-morning, no late-evening), which'll make algorithm more efficient and result cleaner
-1. Create Schedule UI display   
-    * First scheudle is automatically displayed and highlighted.
-    * when hovering on schedules, they will be outlined in the list and displayed in a calendar component below. Hovering over a specific course will highlight it's blocks in the schedule. Make sure to add custom timeblocks
-1. If no conflict-free schedules are found (or maybe regardless), allow users to see those conflicting schedules using the Schedule UI so that they can manually "debug" schedule conflcits.
-    * Schedule Component UI needs to be able to gracefully display conflicting time blocks
-
 ## New Core Feature for 2.0
 1. Accounts, friends, be able to see the courses that friends are registered in
 
