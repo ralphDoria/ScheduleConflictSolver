@@ -157,7 +157,7 @@ window.addEventListener("message", (event) => {
                         "GRADE_MODE_CODE": c.course.gradeModeCode || "",
                         "SWAPPED_IN": "",
                         "SWAPPED_OUT": "",
-                        "ConsentOfInstructorCRN": "",
+                        "ConsentOfInstructorCRN": crn,
                         "MESSAGES": []
                     };
                 }
