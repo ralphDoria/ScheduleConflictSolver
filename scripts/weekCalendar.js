@@ -6,6 +6,7 @@ const scsWeekCalendar = (() => {
     let bodyEl = null;
     let finalsEl = null;
     let finalsBodyEl = null;
+    let finalsContentEl = null;
     let initialized = false;
 
     const DAYS = [
@@ -18,7 +19,7 @@ const scsWeekCalendar = (() => {
         { key: "S", label: "Sat" }
     ];
 
-    const PX_PER_HOUR = 50;
+    const PX_PER_HOUR = 25;
     const DEFAULT_START_HOUR = 8;
     const DEFAULT_END_HOUR = 18;
 
@@ -42,7 +43,11 @@ const scsWeekCalendar = (() => {
             .scs-cal-block.scs-cal-highlight { box-shadow: 0 0 0 2px #333; z-index: 10; }
             .scs-cal-empty { padding: 20px; text-align: center; color: #888; font-style: italic; font-size: 12px; }
             #scs-finals-calendar { margin-top: 10px; border: 1px solid #CCD4E0; border-radius: 4px; overflow: hidden; background: #fff; }
-            .scs-finals-title { font-weight: bold; font-size: 12px; padding: 6px 8px; background: #e2e7ef; border-bottom: 1px solid #CCD4E0; }
+            .scs-cal-section-title { font-weight: bold; font-size: 12px; padding: 6px 8px; background: #e2e7ef; border-bottom: 1px solid #CCD4E0; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+            .scs-cal-section-title:hover { background: #d8dde6; }
+            .scs-cal-collapse-arrow { font-size: 10px; transition: transform 0.2s; }
+            .scs-finals-title { font-weight: bold; font-size: 12px; padding: 6px 8px; background: #e2e7ef; border-bottom: 1px solid #CCD4E0; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+            .scs-finals-title:hover { background: #d8dde6; }
         `;
         document.head.appendChild(style);
     }
@@ -291,7 +296,7 @@ const scsWeekCalendar = (() => {
         const startMinutes = startHour * 60;
 
         // Build header
-        const existingHeader = finalsEl.querySelector(".scs-cal-header");
+        const existingHeader = finalsContentEl.querySelector(".scs-cal-header");
         if (existingHeader) existingHeader.remove();
         const header = document.createElement("div");
         header.className = "scs-cal-header";
@@ -304,8 +309,8 @@ const scsWeekCalendar = (() => {
             cell.textContent = formatDateLabel(date);
             header.appendChild(cell);
         }
-        // Insert header after title, before body
-        finalsEl.insertBefore(header, finalsBodyEl);
+        // Insert header before body
+        finalsContentEl.insertBefore(header, finalsBodyEl);
 
         // Build body
         finalsBodyEl.innerHTML = "";
@@ -396,6 +401,16 @@ const scsWeekCalendar = (() => {
             calendarEl = document.createElement("div");
             calendarEl.id = "scs-week-calendar";
 
+            // Weekly title (collapsible)
+            const weeklyTitle = document.createElement("div");
+            weeklyTitle.className = "scs-cal-section-title";
+            weeklyTitle.innerHTML = '<span class="scs-cal-collapse-arrow">&#9662;</span> Weekly Schedule';
+            calendarEl.appendChild(weeklyTitle);
+
+            // Collapsible content wrapper
+            const weeklyContent = document.createElement("div");
+            weeklyContent.className = "scs-cal-weekly-content";
+
             // Header
             const header = document.createElement("div");
             header.className = "scs-cal-header";
@@ -408,26 +423,49 @@ const scsWeekCalendar = (() => {
                 cell.textContent = day.label;
                 header.appendChild(cell);
             }
-            calendarEl.appendChild(header);
+            weeklyContent.appendChild(header);
 
             // Body
             bodyEl = document.createElement("div");
             bodyEl.className = "scs-cal-body";
-            calendarEl.appendChild(bodyEl);
+            weeklyContent.appendChild(bodyEl);
 
+            calendarEl.appendChild(weeklyContent);
             container.appendChild(calendarEl);
+
+            // Toggle weekly calendar
+            weeklyTitle.addEventListener("click", () => {
+                const arrow = weeklyTitle.querySelector(".scs-cal-collapse-arrow");
+                const isHidden = weeklyContent.style.display === "none";
+                weeklyContent.style.display = isHidden ? "" : "none";
+                arrow.style.transform = isHidden ? "" : "rotate(-90deg)";
+            });
 
             // Finals calendar
             finalsEl = document.createElement("div");
             finalsEl.id = "scs-finals-calendar";
             const finalsTitle = document.createElement("div");
             finalsTitle.className = "scs-finals-title";
-            finalsTitle.textContent = "Final Exams";
+            finalsTitle.innerHTML = '<span class="scs-cal-collapse-arrow" style="transform: rotate(-90deg);">&#9662;</span> Final Exams';
             finalsEl.appendChild(finalsTitle);
+
+            // Finals collapsible content wrapper
+            finalsContentEl = document.createElement("div");
+            finalsContentEl.className = "scs-cal-finals-content";
+            finalsContentEl.style.display = "none";
             finalsBodyEl = document.createElement("div");
             finalsBodyEl.className = "scs-cal-body";
-            finalsEl.appendChild(finalsBodyEl);
+            finalsContentEl.appendChild(finalsBodyEl);
+            finalsEl.appendChild(finalsContentEl);
             container.appendChild(finalsEl);
+
+            // Toggle finals calendar
+            finalsTitle.addEventListener("click", () => {
+                const arrow = finalsTitle.querySelector(".scs-cal-collapse-arrow");
+                const isHidden = finalsContentEl.style.display === "none";
+                finalsContentEl.style.display = isHidden ? "" : "none";
+                arrow.style.transform = isHidden ? "" : "rotate(-90deg)";
+            });
 
             initialized = true;
         },
