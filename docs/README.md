@@ -6,7 +6,9 @@ Description: ScheduleBob is an automatic schedule builder & course conflict solv
 Given your preferences for courses, from general (e.g. I just want any philosophy course that fits into my current schedule) to specific (e.g. I want to keep this exact course and section because my friends are in it), it'll find all possible, conflict-free schedules for you to choose from.
 
 ## Bugs:
-1. Schedules exported from ScheduleBob cannot be reimported (some server state/browserstate we didn't update)
+~~1. Add naming schedules and make sure a duplicate name isn't provided~~
+1. Make the calendar component more condensed verically, and make them dropdown rather than scroll
+1. Why is adding and removing taking so long? taking so long?
 
 
 
