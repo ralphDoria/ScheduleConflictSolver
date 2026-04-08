@@ -593,8 +593,8 @@ if (div_leftContainer != null) {
                         html += scsBuildScheduleTable(allConflictSchedules, "conflict", false);
                     }
 
-                    // Calendar container
-                    html += '<div id="scs-calendar-container"></div>';
+                    // Calendar container (scrollable)
+                    html += '<div id="scs-calendar-scroll" style="max-height: 400px; overflow-y: auto; border: 1px solid #CCD4E0; border-radius: 4px; margin-top: 8px;"><div id="scs-calendar-container"></div></div>';
 
                     placeholder.innerHTML = html;
 
@@ -1030,6 +1030,49 @@ if (div_leftContainer != null) {
             scsFriendsModal.init(document.getElementById("scs-container"));
             document.getElementById("scs-friends-btn").addEventListener("click", () => {
                 scsFriendsModal.open();
+            });
+
+            // Sync user's courses to Supabase on auth
+            document.addEventListener("scs-friends-authenticated", async (e) => {
+                const user = e.detail.user;
+                try {
+                    const { schedules, currentScheduleName } = await requestFromPage(PAGE_MESSAGES.GET_SCHEDULE_DATA);
+                    const courseNames = await getCurrentScheduleCourseNames(currentScheduleName, schedules);
+                    if (courseNames.length > 0) {
+                        chrome.runtime.sendMessage({
+                            type: "SCS_SYNC_COURSES",
+                            email: user.email,
+                            courses: courseNames
+                        });
+                    }
+                } catch (err) {
+                    console.warn("[SCS] Failed to sync courses:", err);
+                }
+            });
+
+            // Add friend's course to an empty search slot
+            document.addEventListener("scs-add-course-to-slot", (e) => {
+                const courseName = e.detail.courseName;
+                const rows = document.querySelectorAll("#scs-course-rows .scs-course-row");
+                let targetInput = null;
+                for (const row of rows) {
+                    const input = row.querySelector(".scs-multi-input input[type='text']");
+                    if (input && input.value.trim() === "") {
+                        targetInput = input;
+                        break;
+                    }
+                }
+                if (!targetInput) {
+                    const newRow = scsCreateRow();
+                    tbody.appendChild(newRow);
+                    scsUpdateRowNumbers();
+                    scsUpdateRemoveButtons();
+                    targetInput = newRow.querySelector(".scs-multi-input input[type='text']");
+                }
+                targetInput.value = courseName;
+                const allRows = document.querySelectorAll("#scs-course-rows .scs-course-row");
+                const rowIndex = [...allRows].indexOf(targetInput.closest(".scs-course-row"));
+                if (rowIndex >= 0) scsSearchRow(rowIndex);
             });
 
             scsShowPhase(1);
