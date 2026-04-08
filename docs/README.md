@@ -7,8 +7,8 @@ Given your preferences for courses, from general (e.g. I just want any philosoph
 
 ## Bugs:
 ~~1. Add naming schedules and make sure a duplicate name isn't provided~~
-1. Make the calendar component more condensed verically, and make them dropdown rather than scroll
-1. Why is adding and removing taking so long? taking so long?
+~~1. Make the calendar component more condensed verically, and make them dropdown rather than scroll~~
+~~1. Why is adding and removing taking so long? taking so long?~~
 
 
 

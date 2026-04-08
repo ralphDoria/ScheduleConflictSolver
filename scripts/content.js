@@ -709,25 +709,65 @@ if (div_leftContainer != null) {
 
                                     closeModal();
                                     btn.disabled = true;
-                                    btn.textContent = "Adding...";
+                                    btn.textContent = "Creating...";
+
+                                    const controller = new AbortController();
+                                    const addTimeout = setTimeout(() => controller.abort(), 30000);
 
                                     try {
                                         const createRes = await createScheduleAndSync(termCode, scheduleName);
                                         if (!createRes.Success) throw new Error("Failed to create schedule");
                                         btn.dataset.scheduleName = scheduleName;
 
-                                        for (const entry of schedule) {
-                                            const searchData = await search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode);
+                                        // Parallel search for all courses
+                                        btn.textContent = "Searching...";
+                                        const searchResults = await Promise.all(
+                                            schedule.map(entry =>
+                                                search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode, controller.signal)
+                                                    .catch(err => {
+                                                        console.error(`Search failed for ${entry.subjectCode} ${entry.courseNum}:`, err);
+                                                        return null;
+                                                    })
+                                            )
+                                        );
+
+                                        // Match results to courses
+                                        const coursesToAdd = [];
+                                        for (let i = 0; i < schedule.length; i++) {
+                                            const entry = schedule[i];
+                                            const searchData = searchResults[i];
                                             if (!searchData) continue;
                                             const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
-                                            if (!match) continue;
-                                            await addCourseAndSync(termCode, scheduleName, match.course.crn, match);
+                                            if (!match) {
+                                                console.warn(`No match for ${entry.subjectCode} ${entry.courseNum} section ${entry.seqNum}`);
+                                                continue;
+                                            }
+                                            coursesToAdd.push(match);
                                         }
+
+                                        // Add courses sequentially (bridge needs serial DOM updates)
+                                        let added = 0;
+                                        for (let i = 0; i < coursesToAdd.length; i++) {
+                                            if (controller.signal.aborted) {
+                                                console.error(`Timeout: added ${added}/${coursesToAdd.length} courses before abort`);
+                                                throw new Error("Operation timed out");
+                                            }
+                                            btn.textContent = `Adding ${i + 1}/${coursesToAdd.length}...`;
+                                            try {
+                                                await addCourseAndSync(termCode, scheduleName, coursesToAdd[i].course.crn, coursesToAdd[i]);
+                                                added++;
+                                            } catch (err) {
+                                                console.error(`addCourseAndSync failed for CRN ${coursesToAdd[i].course.crn}:`, err);
+                                            }
+                                        }
+
                                         btn.classList.add("scs-toggle-added");
                                         btn.textContent = "Remove";
                                     } catch (err) {
-                                        console.error("Schedule toggle failed:", err);
+                                        console.error("Add schedule failed:", err);
                                         btn.textContent = "Add";
+                                    } finally {
+                                        clearTimeout(addTimeout);
                                     }
                                     btn.disabled = false;
                                 };
@@ -738,7 +778,7 @@ if (div_leftContainer != null) {
                                 });
 
                             } else {
-                                // Remove flow (unchanged)
+                                // Remove flow
                                 btn.disabled = true;
                                 btn.textContent = "Removing...";
                                 try {
@@ -748,7 +788,7 @@ if (div_leftContainer != null) {
                                     btn.textContent = "Add";
                                     delete btn.dataset.scheduleName;
                                 } catch (err) {
-                                    console.error("Schedule toggle failed:", err);
+                                    console.error("Remove schedule failed:", err, "scheduleName:", btn.dataset.scheduleName);
                                     btn.textContent = "Remove";
                                 }
                                 btn.disabled = false;
