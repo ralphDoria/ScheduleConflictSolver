@@ -3,6 +3,7 @@
   "description": "An automatic schedule builder & course conflict solver for UC Davis's ScheduleBuilder",
   "version": "1.1",
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA421Ht3qLa87E4CdfB4B97BKPcUGqyXyD7H0NvaI4fZbyhzOf2b4np271kmHOe6UpmI3aXrlnrENLF5OacVnONKnZ1QhuiOm/1K0+uA5CX9Yj2+bMnlcT1ErKivqw+9sPhe33BJxQG6PH+oLC1ZVI6fWLHOAbCen6fMH1NWXQDaIvVY8iWm/0++cpbehGUOGcNI649+ov14x7EW/bGswGInuKDle6NjXQerZDanyrGsiP2Kj2ZqoghMwf5YCVYcxxjHrrKGdW79xyuYaZu2OunvxzI73EK8feq7cABX8dmyUdtQ1kkuIC+LBfSJERl12M9AqBiX5vhafeJ1BBE7uxNwIDAQAB",
   "icons": {
     "16": "images/ScheduleBobLogoZoomed.png",
     "48": "images/ScheduleBobLogoZoomed.png",
@@ -11,13 +12,6 @@
   "permissions": ["identity", "storage"],
   "background": {
     "service_worker": "scripts/background.js"
-  },
-  "oauth2": {
-    "client_id": "8666715098-ni83ap49asa89f3avqhoq6s9pk5ec2jg.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile"
-    ]
   },
   "action": {
     "default_popup": "popup/popup.html",
