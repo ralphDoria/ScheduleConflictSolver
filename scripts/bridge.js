@@ -176,13 +176,17 @@ window.addEventListener("message", (event) => {
         case "SYNC_REMOVE_SCHEDULE": {
             try {
                 var name = params.name;
+                var targetIndex = Schedules.findIndex(function(s) { return s.Name === name; });
+                if (targetIndex === -1) throw new Error("Schedule not found: " + name);
 
-                if (Schedules[ThisScheduleIndex].Name.toLowerCase() === "schedule 1") {
-                    Schedules[ThisScheduleIndex].SelectedList = {};
+                if (Schedules[targetIndex].Name.toLowerCase() === "schedule 1") {
+                    Schedules[targetIndex].SelectedList = {};
                 } else {
-                    Schedules.splice(ThisScheduleIndex, 1);
-                    if (ThisScheduleIndex > Schedules.length - 1) {
+                    Schedules.splice(targetIndex, 1);
+                    if (ThisScheduleIndex >= Schedules.length) {
                         ThisScheduleIndex = Schedules.length - 1;
+                    } else if (targetIndex < ThisScheduleIndex) {
+                        ThisScheduleIndex--;
                     }
                 }
 
