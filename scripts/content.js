@@ -15,20 +15,34 @@ document.documentElement.appendChild(bridgeScript);
 
 async function getCurrentScheduleCourseNames(thisScheduleName, schedules) {
     const schedule = schedules.find(s => s.Name === thisScheduleName);
-    if (!schedule) return [];
+    if (!schedule) {
+        console.warn("[SCS Import] Schedule not found:", thisScheduleName);
+        return [];
+    }
 
     const crns = [];
     for (const value of Object.values(schedule.SelectedList)) {
         crns.push(value.ConsentOfInstructorCRN);
     }
 
+    if (crns.length === 0) {
+        console.warn("[SCS Import] No CRNs found in schedule:", thisScheduleName);
+        return [];
+    }
+
     const results = await Promise.all(
-        crns.map(crn => search(String(crn), "", userPidm, termCode))
+        crns.map(crn => search(String(crn), "", userPidm, termCode).catch(err => {
+            console.error("[SCS Import] Search failed for CRN:", crn, err);
+            return null;
+        }))
     );
 
-    return results
+    const courseNames = results
         .filter(data => data && data.length > 0)
         .map(data => data[0].course.shortDesc);
+
+    console.log("[SCS Import] Found", courseNames.length, "courses from", crns.length, "CRNs:", courseNames);
+    return courseNames;
 }
 
 // Temporary test function — call from console: testScheduleBridge()
@@ -587,10 +601,16 @@ if (div_leftContainer != null) {
                         html += `<p style="font-style: normal; color: #333; margin-bottom: 6px;">No conflict-free schedules found.</p>`;
                     }
 
-                    // Conflicting schedules table
+                    // Conflicting schedules table (collapsible, collapsed by default)
                     if (allConflictSchedules.length > 0) {
-                        html += `<p class="scs-conflict-header">${allConflictSchedules.length} conflicting schedule(s):</p>`;
+                        html += `<div class="scs-conflict-section">`;
+                        html += `<p class="scs-conflict-header scs-collapsible" style="cursor: pointer; user-select: none;">
+                            <span class="scs-collapse-arrow" style="display: inline-block; transition: transform 0.2s; transform: rotate(-90deg);">&#9662;</span>
+                            ${allConflictSchedules.length} conflicting schedule(s):
+                        </p>`;
+                        html += `<div class="scs-conflict-body" style="display: none;">`;
                         html += scsBuildScheduleTable(allConflictSchedules, "conflict", false);
+                        html += `</div></div>`;
                     }
 
                     // Calendar container (scrollable)
@@ -611,6 +631,18 @@ if (div_leftContainer != null) {
                         scsSelectScheduleColumn("conflict", 0);
                     }
 
+                    // Collapsible conflict section toggle
+                    const conflictToggle = placeholder.querySelector(".scs-collapsible");
+                    if (conflictToggle) {
+                        conflictToggle.addEventListener("click", () => {
+                            const body = placeholder.querySelector(".scs-conflict-body");
+                            const arrow = conflictToggle.querySelector(".scs-collapse-arrow");
+                            const isHidden = body.style.display === "none";
+                            body.style.display = isHidden ? "" : "none";
+                            arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(-90deg)";
+                        });
+                    }
+
                     // --- Interaction handlers on placeholder ---
 
                     // Column click (select) & Add/Remove toggle
@@ -622,37 +654,105 @@ if (div_leftContainer != null) {
                             const schedule = allValidSchedules[schedIdx];
                             const isAdded = btn.classList.contains("scs-toggle-added");
 
-                            btn.disabled = true;
-                            btn.textContent = isAdded ? "Removing..." : "Adding...";
+                            if (!isAdded) {
+                                // Show name modal before adding
+                                const { schedules } = await requestFromPage(PAGE_MESSAGES.GET_SCHEDULE_DATA);
+                                const existingNames = schedules.map(s => s.Name.toLowerCase());
+                                const defaultName = "ScheduleBob " + (schedIdx + 1);
 
-                            try {
-                                if (!isAdded) {
-                                    const scheduleName = "ScheduleBob " + (schedIdx + 1);
-                                    const createRes = await createScheduleAndSync(termCode, scheduleName);
-                                    if (!createRes.Success) throw new Error("Failed to create schedule");
-                                    btn.dataset.scheduleName = scheduleName;
+                                const container = document.getElementById("scs-container");
+                                const modalOverlay = document.createElement("div");
+                                modalOverlay.className = "scs-name-modal-overlay";
+                                modalOverlay.innerHTML = `
+                                    <div class="scs-name-modal">
+                                        <p>Name your schedule</p>
+                                        <input type="text" class="scs-name-modal-input" value="${defaultName}">
+                                        <div class="scs-name-modal-error"></div>
+                                        <div class="scs-name-modal-actions">
+                                            <button class="scs-name-modal-cancel">Cancel</button>
+                                            <button class="scs-name-modal-create">Create</button>
+                                        </div>
+                                    </div>
+                                `;
+                                container.appendChild(modalOverlay);
 
-                                    for (const entry of schedule) {
-                                        const searchData = await search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode);
-                                        if (!searchData) continue;
-                                        const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
-                                        if (!match) continue;
-                                        await addCourseAndSync(termCode, scheduleName, match.course.crn, match);
+                                const nameInput = modalOverlay.querySelector(".scs-name-modal-input");
+                                const errorEl = modalOverlay.querySelector(".scs-name-modal-error");
+                                nameInput.select();
+
+                                const closeModal = () => modalOverlay.remove();
+
+                                modalOverlay.querySelector(".scs-name-modal-cancel").addEventListener("click", closeModal);
+                                modalOverlay.addEventListener("click", (ev) => {
+                                    if (ev.target === modalOverlay) closeModal();
+                                });
+
+                                const escHandler = (ev) => {
+                                    if (ev.key === "Escape") { closeModal(); document.removeEventListener("keydown", escHandler); }
+                                };
+                                document.addEventListener("keydown", escHandler);
+
+                                const doCreate = async () => {
+                                    const scheduleName = nameInput.value.trim();
+                                    if (!scheduleName) {
+                                        errorEl.textContent = "Name cannot be empty";
+                                        return;
                                     }
-                                    btn.classList.add("scs-toggle-added");
-                                    btn.textContent = "Remove";
-                                } else {
+                                    if (existingNames.includes(scheduleName.toLowerCase())) {
+                                        errorEl.textContent = "Name already exists";
+                                        return;
+                                    }
+
+                                    const createBtn = modalOverlay.querySelector(".scs-name-modal-create");
+                                    createBtn.disabled = true;
+                                    createBtn.textContent = "Creating...";
+
+                                    closeModal();
+                                    btn.disabled = true;
+                                    btn.textContent = "Adding...";
+
+                                    try {
+                                        const createRes = await createScheduleAndSync(termCode, scheduleName);
+                                        if (!createRes.Success) throw new Error("Failed to create schedule");
+                                        btn.dataset.scheduleName = scheduleName;
+
+                                        for (const entry of schedule) {
+                                            const searchData = await search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode);
+                                            if (!searchData) continue;
+                                            const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
+                                            if (!match) continue;
+                                            await addCourseAndSync(termCode, scheduleName, match.course.crn, match);
+                                        }
+                                        btn.classList.add("scs-toggle-added");
+                                        btn.textContent = "Remove";
+                                    } catch (err) {
+                                        console.error("Schedule toggle failed:", err);
+                                        btn.textContent = "Add";
+                                    }
+                                    btn.disabled = false;
+                                };
+
+                                modalOverlay.querySelector(".scs-name-modal-create").addEventListener("click", doCreate);
+                                nameInput.addEventListener("keydown", (ev) => {
+                                    if (ev.key === "Enter") doCreate();
+                                });
+
+                            } else {
+                                // Remove flow (unchanged)
+                                btn.disabled = true;
+                                btn.textContent = "Removing...";
+                                try {
                                     const scheduleName = btn.dataset.scheduleName;
                                     if (scheduleName) await removeScheduleAndSync(termCode, scheduleName);
                                     btn.classList.remove("scs-toggle-added");
                                     btn.textContent = "Add";
                                     delete btn.dataset.scheduleName;
+                                } catch (err) {
+                                    console.error("Schedule toggle failed:", err);
+                                    btn.textContent = "Remove";
                                 }
-                            } catch (err) {
-                                console.error("Schedule toggle failed:", err);
-                                btn.textContent = isAdded ? "Remove" : "Add";
+                                btn.disabled = false;
                             }
-                            btn.disabled = false;
                             return;
                         }
 
@@ -810,9 +910,14 @@ if (div_leftContainer != null) {
 
             // Import current schedule
             document.getElementById("scs-import-btn").addEventListener("click", async () => {
+                console.log("[SCS Import] Import button clicked");
                 const { schedules, currentScheduleName } = await requestFromPage(PAGE_MESSAGES.GET_SCHEDULE_DATA);
+                console.log("[SCS Import] Page data:", { currentScheduleName, schedules });
                 const courseNames = await getCurrentScheduleCourseNames(currentScheduleName, schedules);
-                if (courseNames.length === 0) return;
+                if (courseNames.length === 0) {
+                    console.warn("[SCS Import] No courses to import");
+                    return;
+                }
 
                 // Clear existing rows and create one per course
                 tbody.innerHTML = "";
