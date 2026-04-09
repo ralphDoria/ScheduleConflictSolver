@@ -449,6 +449,8 @@ if (div_leftContainer != null) {
             let calendarTimeblocks = []; // named timeblocks for calendar display
             let selectedScheduleKey = null; // { type: "valid"|"conflict", idx: number }
             let calendarInitialized = false;
+            let currentHover = null;
+            let highlightedCell = null;
 
             function scsSerializeSchedule(schedule) {
                 return schedule.map(e => e.subjectCode + "|" + e.courseNum + "|" + e.seqNum).join(";");
@@ -617,6 +619,8 @@ if (div_leftContainer != null) {
                     html += '<div id="scs-calendar-scroll" style="max-height: 400px; overflow-y: auto; border: 1px solid #CCD4E0; border-radius: 4px; margin-top: 8px;"><div id="scs-calendar-container"></div></div>';
 
                     placeholder.innerHTML = html;
+                    currentHover = null;
+                    highlightedCell = null;
 
                     // Initialize calendar
                     const calContainer = document.getElementById("scs-calendar-container");
@@ -630,228 +634,6 @@ if (div_leftContainer != null) {
                     } else if (allConflictSchedules.length > 0) {
                         scsSelectScheduleColumn("conflict", 0);
                     }
-
-                    // Collapsible conflict section toggle
-                    const conflictToggle = placeholder.querySelector(".scs-collapsible");
-                    if (conflictToggle) {
-                        conflictToggle.addEventListener("click", () => {
-                            const body = placeholder.querySelector(".scs-conflict-body");
-                            const arrow = conflictToggle.querySelector(".scs-collapse-arrow");
-                            const isHidden = body.style.display === "none";
-                            body.style.display = isHidden ? "" : "none";
-                            arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(-90deg)";
-                        });
-                    }
-
-                    // --- Interaction handlers on placeholder ---
-
-                    // Column click (select) & Add/Remove toggle
-                    placeholder.addEventListener("click", async (e) => {
-                        // Add/Remove button
-                        const btn = e.target.closest(".scs-schedule-toggle");
-                        if (btn && !btn.disabled) {
-                            const schedIdx = parseInt(btn.dataset.schedule);
-                            const schedule = allValidSchedules[schedIdx];
-                            const isAdded = btn.classList.contains("scs-toggle-added");
-
-                            if (!isAdded) {
-                                // Show name modal before adding
-                                const { schedules } = await requestFromPage(PAGE_MESSAGES.GET_SCHEDULE_DATA);
-                                const existingNames = schedules.map(s => s.Name.toLowerCase());
-                                const defaultName = "ScheduleBob " + (schedIdx + 1);
-
-                                const container = document.getElementById("scs-container");
-                                const modalOverlay = document.createElement("div");
-                                modalOverlay.className = "scs-name-modal-overlay";
-                                modalOverlay.innerHTML = `
-                                    <div class="scs-name-modal">
-                                        <p>Name your schedule</p>
-                                        <input type="text" class="scs-name-modal-input" value="${defaultName}">
-                                        <div class="scs-name-modal-error"></div>
-                                        <div class="scs-name-modal-actions">
-                                            <button class="scs-name-modal-cancel">Cancel</button>
-                                            <button class="scs-name-modal-create">Create</button>
-                                        </div>
-                                    </div>
-                                `;
-                                container.appendChild(modalOverlay);
-
-                                const nameInput = modalOverlay.querySelector(".scs-name-modal-input");
-                                const errorEl = modalOverlay.querySelector(".scs-name-modal-error");
-                                nameInput.select();
-
-                                const closeModal = () => modalOverlay.remove();
-
-                                modalOverlay.querySelector(".scs-name-modal-cancel").addEventListener("click", closeModal);
-                                modalOverlay.addEventListener("click", (ev) => {
-                                    if (ev.target === modalOverlay) closeModal();
-                                });
-
-                                const escHandler = (ev) => {
-                                    if (ev.key === "Escape") { closeModal(); document.removeEventListener("keydown", escHandler); }
-                                };
-                                document.addEventListener("keydown", escHandler);
-
-                                const doCreate = async () => {
-                                    const scheduleName = nameInput.value.trim();
-                                    if (!scheduleName) {
-                                        errorEl.textContent = "Name cannot be empty";
-                                        return;
-                                    }
-                                    if (existingNames.includes(scheduleName.toLowerCase())) {
-                                        errorEl.textContent = "Name already exists";
-                                        return;
-                                    }
-
-                                    const createBtn = modalOverlay.querySelector(".scs-name-modal-create");
-                                    createBtn.disabled = true;
-                                    createBtn.textContent = "Creating...";
-
-                                    closeModal();
-                                    btn.disabled = true;
-                                    btn.textContent = "Creating...";
-
-                                    const controller = new AbortController();
-                                    const addTimeout = setTimeout(() => controller.abort(), 30000);
-
-                                    try {
-                                        const createRes = await createScheduleAndSync(termCode, scheduleName);
-                                        if (!createRes.Success) throw new Error("Failed to create schedule");
-                                        btn.dataset.scheduleName = scheduleName;
-
-                                        // Parallel search for all courses
-                                        btn.textContent = "Searching...";
-                                        const searchResults = await Promise.all(
-                                            schedule.map(entry =>
-                                                search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode, controller.signal)
-                                                    .catch(err => {
-                                                        console.error(`Search failed for ${entry.subjectCode} ${entry.courseNum}:`, err);
-                                                        return null;
-                                                    })
-                                            )
-                                        );
-
-                                        // Match results to courses
-                                        const coursesToAdd = [];
-                                        for (let i = 0; i < schedule.length; i++) {
-                                            const entry = schedule[i];
-                                            const searchData = searchResults[i];
-                                            if (!searchData) continue;
-                                            const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
-                                            if (!match) {
-                                                console.warn(`No match for ${entry.subjectCode} ${entry.courseNum} section ${entry.seqNum}`);
-                                                continue;
-                                            }
-                                            coursesToAdd.push(match);
-                                        }
-
-                                        // Add courses sequentially (bridge needs serial DOM updates)
-                                        let added = 0;
-                                        for (let i = 0; i < coursesToAdd.length; i++) {
-                                            if (controller.signal.aborted) {
-                                                console.error(`Timeout: added ${added}/${coursesToAdd.length} courses before abort`);
-                                                throw new Error("Operation timed out");
-                                            }
-                                            btn.textContent = `Adding ${i + 1}/${coursesToAdd.length}...`;
-                                            try {
-                                                await addCourseAndSync(termCode, scheduleName, coursesToAdd[i].course.crn, coursesToAdd[i]);
-                                                added++;
-                                            } catch (err) {
-                                                console.error(`addCourseAndSync failed for CRN ${coursesToAdd[i].course.crn}:`, err);
-                                            }
-                                        }
-
-                                        btn.classList.add("scs-toggle-added");
-                                        btn.textContent = "Remove";
-                                    } catch (err) {
-                                        console.error("Add schedule failed:", err);
-                                        btn.textContent = "Add";
-                                    } finally {
-                                        clearTimeout(addTimeout);
-                                    }
-                                    btn.disabled = false;
-                                };
-
-                                modalOverlay.querySelector(".scs-name-modal-create").addEventListener("click", doCreate);
-                                nameInput.addEventListener("keydown", (ev) => {
-                                    if (ev.key === "Enter") doCreate();
-                                });
-
-                            } else {
-                                // Remove flow
-                                btn.disabled = true;
-                                btn.textContent = "Removing...";
-                                try {
-                                    const scheduleName = btn.dataset.scheduleName;
-                                    if (scheduleName) await removeScheduleAndSync(termCode, scheduleName);
-                                    btn.classList.remove("scs-toggle-added");
-                                    btn.textContent = "Add";
-                                    delete btn.dataset.scheduleName;
-                                } catch (err) {
-                                    console.error("Remove schedule failed:", err, "scheduleName:", btn.dataset.scheduleName);
-                                    btn.textContent = "Remove";
-                                }
-                                btn.disabled = false;
-                            }
-                            return;
-                        }
-
-                        // Column click (select)
-                        const cell = e.target.closest("[data-col][data-type]");
-                        if (cell) {
-                            scsSelectScheduleColumn(cell.dataset.type, parseInt(cell.dataset.col));
-                        }
-                    });
-
-                    // Column hover (preview)
-                    let currentHover = null;
-                    placeholder.addEventListener("mouseover", (e) => {
-                        const cell = e.target.closest("[data-col][data-type]");
-                        if (!cell) return;
-                        const type = cell.dataset.type;
-                        const col = parseInt(cell.dataset.col);
-                        const key = type + ":" + col;
-                        if (currentHover === key) return;
-                        if (currentHover) {
-                            const [prevType, prevCol] = currentHover.split(":");
-                            scsUnhoverScheduleColumn(prevType, parseInt(prevCol));
-                        }
-                        currentHover = key;
-                        scsHoverScheduleColumn(type, col);
-                    });
-
-                    placeholder.addEventListener("mouseleave", () => {
-                        if (currentHover) {
-                            const [prevType, prevCol] = currentHover.split(":");
-                            scsUnhoverScheduleColumn(prevType, parseInt(prevCol));
-                            currentHover = null;
-                        }
-                    });
-
-                    // Course cell hover (highlight in calendar)
-                    let highlightedCell = null;
-                    placeholder.addEventListener("mouseover", (e) => {
-                        const cell = e.target.closest("td[data-subject-code]");
-                        if (cell === highlightedCell) return;
-                        if (highlightedCell) {
-                            highlightedCell.classList.remove("scs-cell-highlight");
-                            scsWeekCalendar.clearHighlight();
-                            highlightedCell = null;
-                        }
-                        if (cell) {
-                            highlightedCell = cell;
-                            cell.classList.add("scs-cell-highlight");
-                            scsWeekCalendar.highlightCourse(cell.dataset.subjectCode, cell.dataset.courseNum, cell.dataset.seqNum);
-                        }
-                    });
-
-                    placeholder.addEventListener("mouseleave", () => {
-                        if (highlightedCell) {
-                            highlightedCell.classList.remove("scs-cell-highlight");
-                            scsWeekCalendar.clearHighlight();
-                            highlightedCell = null;
-                        }
-                    });
 
                     scsShowPhase(2);
                     scsHideLoading();
@@ -1218,6 +1000,227 @@ if (div_leftContainer != null) {
                 const allRows = document.querySelectorAll("#scs-course-rows .scs-course-row");
                 const rowIndex = [...allRows].indexOf(targetInput.closest(".scs-course-row"));
                 if (rowIndex >= 0) scsSearchRow(rowIndex);
+            });
+
+            // --- One-time interaction handlers on placeholder (delegated) ---
+            const placeholder = document.getElementById("scs-computed-placeholder");
+
+            // Collapsible conflict section toggle (delegated)
+            placeholder.addEventListener("click", (e) => {
+                const toggle = e.target.closest(".scs-collapsible");
+                if (!toggle) return;
+                const body = placeholder.querySelector(".scs-conflict-body");
+                const arrow = toggle.querySelector(".scs-collapse-arrow");
+                if (!body || !arrow) return;
+                const isHidden = body.style.display === "none";
+                body.style.display = isHidden ? "" : "none";
+                arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(-90deg)";
+            });
+
+            // Column click (select) & Add/Remove toggle
+            placeholder.addEventListener("click", async (e) => {
+                // Add/Remove button
+                const btn = e.target.closest(".scs-schedule-toggle");
+                if (btn && !btn.disabled) {
+                    const schedIdx = parseInt(btn.dataset.schedule);
+                    const schedule = allValidSchedules[schedIdx];
+                    const isAdded = btn.classList.contains("scs-toggle-added");
+
+                    if (!isAdded) {
+                        // Show name modal before adding
+                        const { schedules } = await requestFromPage(PAGE_MESSAGES.GET_SCHEDULE_DATA);
+                        const existingNames = schedules.map(s => s.Name.toLowerCase());
+                        const defaultName = "ScheduleBob " + (schedIdx + 1);
+
+                        const container = document.getElementById("scs-container");
+                        const modalOverlay = document.createElement("div");
+                        modalOverlay.className = "scs-name-modal-overlay";
+                        modalOverlay.innerHTML = `
+                            <div class="scs-name-modal">
+                                <p>Name your schedule</p>
+                                <input type="text" class="scs-name-modal-input" value="${defaultName}">
+                                <div class="scs-name-modal-error"></div>
+                                <div class="scs-name-modal-actions">
+                                    <button class="scs-name-modal-cancel">Cancel</button>
+                                    <button class="scs-name-modal-create">Create</button>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(modalOverlay);
+
+                        const nameInput = modalOverlay.querySelector(".scs-name-modal-input");
+                        const errorEl = modalOverlay.querySelector(".scs-name-modal-error");
+                        nameInput.select();
+
+                        const closeModal = () => modalOverlay.remove();
+
+                        modalOverlay.querySelector(".scs-name-modal-cancel").addEventListener("click", closeModal);
+                        modalOverlay.addEventListener("click", (ev) => {
+                            if (ev.target === modalOverlay) closeModal();
+                        });
+
+                        const escHandler = (ev) => {
+                            if (ev.key === "Escape") { closeModal(); document.removeEventListener("keydown", escHandler); }
+                        };
+                        document.addEventListener("keydown", escHandler);
+
+                        const doCreate = async () => {
+                            const scheduleName = nameInput.value.trim();
+                            if (!scheduleName) {
+                                errorEl.textContent = "Name cannot be empty";
+                                return;
+                            }
+                            if (existingNames.includes(scheduleName.toLowerCase())) {
+                                errorEl.textContent = "Name already exists";
+                                return;
+                            }
+
+                            const createBtn = modalOverlay.querySelector(".scs-name-modal-create");
+                            createBtn.disabled = true;
+                            createBtn.textContent = "Creating...";
+
+                            closeModal();
+                            btn.disabled = true;
+                            btn.textContent = "Creating...";
+
+                            const controller = new AbortController();
+                            const addTimeout = setTimeout(() => controller.abort(), 30000);
+
+                            try {
+                                const createRes = await createScheduleAndSync(termCode, scheduleName);
+                                if (!createRes.Success) throw new Error("Failed to create schedule");
+                                btn.dataset.scheduleName = scheduleName;
+
+                                // Parallel search for all courses
+                                btn.textContent = "Searching...";
+                                const searchResults = await Promise.all(
+                                    schedule.map(entry =>
+                                        search(entry.subjectCode + " " + entry.courseNum, "", userPidm, termCode, controller.signal)
+                                            .catch(err => {
+                                                console.error(`Search failed for ${entry.subjectCode} ${entry.courseNum}:`, err);
+                                                return null;
+                                            })
+                                    )
+                                );
+
+                                // Match results to courses
+                                const coursesToAdd = [];
+                                for (let i = 0; i < schedule.length; i++) {
+                                    const entry = schedule[i];
+                                    const searchData = searchResults[i];
+                                    if (!searchData) continue;
+                                    const match = searchData.find(d => d.course.seqNum === entry.seqNum && d.course.courseNum === entry.courseNum);
+                                    if (!match) {
+                                        console.warn(`No match for ${entry.subjectCode} ${entry.courseNum} section ${entry.seqNum}`);
+                                        continue;
+                                    }
+                                    coursesToAdd.push(match);
+                                }
+
+                                // Add courses sequentially (bridge needs serial DOM updates)
+                                let added = 0;
+                                for (let i = 0; i < coursesToAdd.length; i++) {
+                                    if (controller.signal.aborted) {
+                                        console.error(`Timeout: added ${added}/${coursesToAdd.length} courses before abort`);
+                                        throw new Error("Operation timed out");
+                                    }
+                                    btn.textContent = `Adding ${i + 1}/${coursesToAdd.length}...`;
+                                    try {
+                                        await addCourseAndSync(termCode, scheduleName, coursesToAdd[i].course.crn, coursesToAdd[i]);
+                                        added++;
+                                    } catch (err) {
+                                        console.error(`addCourseAndSync failed for CRN ${coursesToAdd[i].course.crn}:`, err);
+                                    }
+                                }
+
+                                btn.classList.add("scs-toggle-added");
+                                btn.textContent = "Remove";
+                            } catch (err) {
+                                console.error("Add schedule failed:", err);
+                                btn.textContent = "Add";
+                            } finally {
+                                clearTimeout(addTimeout);
+                            }
+                            btn.disabled = false;
+                        };
+
+                        modalOverlay.querySelector(".scs-name-modal-create").addEventListener("click", doCreate);
+                        nameInput.addEventListener("keydown", (ev) => {
+                            if (ev.key === "Enter") doCreate();
+                        });
+
+                    } else {
+                        // Remove flow
+                        btn.disabled = true;
+                        btn.textContent = "Removing...";
+                        try {
+                            const scheduleName = btn.dataset.scheduleName;
+                            if (scheduleName) await removeScheduleAndSync(termCode, scheduleName);
+                            btn.classList.remove("scs-toggle-added");
+                            btn.textContent = "Add";
+                            delete btn.dataset.scheduleName;
+                        } catch (err) {
+                            console.error("Remove schedule failed:", err, "scheduleName:", btn.dataset.scheduleName);
+                            btn.textContent = "Remove";
+                        }
+                        btn.disabled = false;
+                    }
+                    return;
+                }
+
+                // Column click (select)
+                const cell = e.target.closest("[data-col][data-type]");
+                if (cell) {
+                    scsSelectScheduleColumn(cell.dataset.type, parseInt(cell.dataset.col));
+                }
+            });
+
+            // Column hover (preview)
+            placeholder.addEventListener("mouseover", (e) => {
+                const cell = e.target.closest("[data-col][data-type]");
+                if (!cell) return;
+                const type = cell.dataset.type;
+                const col = parseInt(cell.dataset.col);
+                const key = type + ":" + col;
+                if (currentHover === key) return;
+                if (currentHover) {
+                    const [prevType, prevCol] = currentHover.split(":");
+                    scsUnhoverScheduleColumn(prevType, parseInt(prevCol));
+                }
+                currentHover = key;
+                scsHoverScheduleColumn(type, col);
+            });
+
+            placeholder.addEventListener("mouseleave", () => {
+                if (currentHover) {
+                    const [prevType, prevCol] = currentHover.split(":");
+                    scsUnhoverScheduleColumn(prevType, parseInt(prevCol));
+                    currentHover = null;
+                }
+            });
+
+            // Course cell hover (highlight in calendar)
+            placeholder.addEventListener("mouseover", (e) => {
+                const cell = e.target.closest("td[data-subject-code]");
+                if (cell === highlightedCell) return;
+                if (highlightedCell) {
+                    highlightedCell.classList.remove("scs-cell-highlight");
+                    scsWeekCalendar.clearHighlight();
+                    highlightedCell = null;
+                }
+                if (cell) {
+                    highlightedCell = cell;
+                    cell.classList.add("scs-cell-highlight");
+                    scsWeekCalendar.highlightCourse(cell.dataset.subjectCode, cell.dataset.courseNum, cell.dataset.seqNum);
+                }
+            });
+
+            placeholder.addEventListener("mouseleave", () => {
+                if (highlightedCell) {
+                    highlightedCell.classList.remove("scs-cell-highlight");
+                    scsWeekCalendar.clearHighlight();
+                    highlightedCell = null;
+                }
             });
 
             scsShowPhase(1);
